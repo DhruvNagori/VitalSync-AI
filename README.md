@@ -51,11 +51,13 @@ application, API, and database run through Docker Compose.
 ### Patient portal
 
 - Registration and login with persistent PostgreSQL storage.
-- Patient dashboard, health overview, charts, and health-history views.
-- Symptom recording and medical-document management.
-- Appointment requests and consent-based information sharing.
-- Doctor messaging and care-plan updates.
-- Hospital discovery and connected-device interfaces.
+- Database-backed dashboard, symptom timeline, and medical-document management.
+- Simulated smart-band scenarios with persisted readings and explainable anomaly rules.
+- Location-filtered doctor discovery and appointment requests.
+- Per-appointment consent snapshots for profile, symptoms, history, wearable
+  readings, alerts, selected documents, written summaries, and chat summaries.
+- Persistent doctor messaging and care-plan updates.
+- Hospital discovery and clearly labelled simulated-device interfaces.
 - Local AI health-information assistant with conversation history.
 - Deterministic emergency-message fallback and visible safety notices.
 - Trusted NIH source links for the currently grounded iron-deficiency topic.
@@ -75,7 +77,8 @@ application, API, and database run through Docker Compose.
 - Signed access tokens and session restoration after page refresh.
 - Unique email and professional registration-number constraints.
 - Authenticated chatbot endpoint.
-- Persistent Docker volume for account data.
+- Persistent Docker volume for accounts, health records, appointments, consent
+  snapshots, files, messages, notes, care plans, chatbot history, and mock wearable data.
 
 ## Technology stack
 
@@ -249,6 +252,7 @@ medical correctness or clinical safety.
 | `ml/dataset/` | Cleaned dataset splits and review queue |
 | `ml/notebooks/` | Training and base-versus-fine-tuned comparison |
 | `ml/results/` | Trainer state and compact result summary |
+| [`ml/results/base_vs_finetuned/REVIEW.md`](ml/results/base_vs_finetuned/REVIEW.md) | Base-vs-fine-tuned metrics and factual-error audit |
 | `ml/scripts/prepare_medquad.py` | Dataset cleaning and splitting pipeline |
 | `ml/gguf/` | Ollama Modelfile and GGUF documentation |
 
@@ -280,6 +284,17 @@ Do not use `--volumes` unless deletion is intentional.
 | `POST` | `/api/v1/auth/login` | No | Verify credentials and issue token |
 | `GET` | `/api/v1/auth/me` | Bearer | Restore current account |
 | `POST` | `/api/v1/chat` | Bearer | Send chatbot request |
+| `GET` | `/api/v1/chat/history` | Bearer | Load persisted chatbot history |
+| `GET/POST` | `/api/v1/symptoms` | Patient | List or create symptom records |
+| `GET` | `/api/v1/wearables` | Patient | Read demo-band state, readings, and alerts |
+| `POST` | `/api/v1/wearables/device` | Patient | Configure the simulated band |
+| `POST` | `/api/v1/wearables/sync` | Patient | Generate and persist mock readings |
+| `GET/POST` | `/api/v1/appointments` | Bearer | List or create appointment requests |
+| `PATCH` | `/api/v1/appointments/{id}/status` | Bearer | Review or cancel an appointment |
+| `GET` | `/api/v1/doctors` | Bearer | Discover registered doctors by city |
+| `GET/POST` | `/api/v1/documents` | Patient | List or upload medical documents |
+| `GET` | `/api/v1/doctor/patients/{id}` | Doctor | Open the consent-scoped workspace |
+| `GET/POST` | `/api/v1/messages` | Bearer | Appointment-linked messaging |
 
 Example chat body:
 
@@ -332,8 +347,9 @@ ai_based_health_monitoring_system/
 │   ├── app/
 │   │   ├── auth_routes.py         # Registration and login API
 │   │   ├── database.py            # SQLAlchemy sessions
+│   │   ├── domain_routes.py       # Care, wearable, document, and messaging APIs
 │   │   ├── main.py                # Chat API and safety/grounding
-│   │   ├── models.py              # PostgreSQL user model
+│   │   ├── models.py              # PostgreSQL healthcare domain models
 │   │   ├── schemas.py             # API schemas
 │   │   └── security.py            # Argon2id and tokens
 │   ├── Dockerfile
@@ -369,6 +385,8 @@ The implementation has been checked with:
 - Patient/doctor registration, duplicate rejection, and Argon2id hashing.
 - Login, token restoration, and role-based routing.
 - Authenticated end-to-end Ollama inference.
+- Patient-to-doctor workflow: symptoms, simulated wearable sync, alerts,
+  consent snapshot, review, note, care plan, and message.
 - Emergency fallback and disclaimer-only response retry.
 - NIH-grounded iron-deficiency response with source links.
 - Adapter reconstruction and SHA-256 verification.
@@ -383,7 +401,9 @@ Synthetic accounts created during testing were removed.
   full trusted-document RAG is not implemented for every topic.
 - Training loss does not establish medical accuracy.
 - Doctor verification has no administrative workflow yet.
-- Several care, messaging, and health-history workflows still use browser storage.
+- Smart-band readings and alerts are simulated; there is no Bluetooth or
+  certified medical-device integration.
+- Anomaly detection uses simple transparent thresholds and is not diagnostic.
 - Token storage and automatic table creation are for local academic use, not a
   production healthcare deployment.
 

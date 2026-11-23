@@ -271,7 +271,7 @@ export default function MedicalRecords() {
     } catch (error) {
       setFormError(
         error.message ||
-        "Unable to save this file. Check available browser storage and try again."
+        "Unable to upload this file to the project database. Please try again."
       );
     } finally {
       setSaving(false);
@@ -300,7 +300,7 @@ export default function MedicalRecords() {
 
   async function handleDelete(document) {
     const confirmed = window.confirm(
-      `Delete "${document.title}" from this browser? This cannot be undone.`
+      `Delete "${document.title}" from the database? This cannot be undone.`
     );
 
     if (!confirmed) return;
@@ -349,9 +349,9 @@ export default function MedicalRecords() {
       <div className="medical-records-notice">
         <LockKeyhole size={17} />
         <p>
-          <strong>Device-only storage:</strong> Documents are saved in this
-          browser on this device using IndexedDB. They are not uploaded to a
-          VitalSync server, shared with a doctor, or backed up to the cloud.
+          <strong>Consent-controlled storage:</strong> Documents are saved in the
+          local VitalSync PostgreSQL database. A doctor can open a document only
+          after you select it in an appointment's sharing options.
         </p>
       </div>
 
@@ -634,11 +634,11 @@ export default function MedicalRecords() {
       <div className="medical-records-privacy">
         <ShieldCheck size={18} />
         <p>
-          <strong>Privacy and medical safety:</strong> This is a local document
-          organiser for demonstration purposes. Files remain in this browser's
-          IndexedDB on this device. Do not upload sensitive real patient records
-          to a shared or public demonstration computer. This page does not
-          interpret reports or provide medical advice.
+          <strong>Privacy and medical safety:</strong> This is an academic document
+          organiser. Files are stored in the local project database and are
+          shared with a doctor only when you explicitly select them during
+          appointment consent. Do not upload real patient records. This page
+          does not interpret reports or provide medical advice.
         </p>
       </div>
 

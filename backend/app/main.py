@@ -7,10 +7,13 @@ import httpx
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from .auth_routes import router as auth_router
-from .database import Base, engine
-from .models import User
+from .domain_routes import router as domain_router
+from .database import Base, engine, get_db
+from .models import ChatMessage as StoredChatMessage, User
 from .security import get_current_user
 
 
@@ -140,6 +143,7 @@ app = FastAPI(
 )
 
 app.include_router(auth_router)
+app.include_router(domain_router)
 
 allowed_origins = [
     origin.strip()
@@ -172,6 +176,7 @@ async def api_health() -> dict[str, str]:
 async def chat(
     request: ChatRequest,
     _current_user: Annotated[User, Depends(get_current_user)],
+    database: Annotated[Session, Depends(get_db)],
 ) -> ChatResponse:
     normalized_question = request.message.casefold()
     emergency_detected = any(
@@ -258,6 +263,12 @@ async def chat(
     if emergency_detected:
         reply = f"{EMERGENCY_NOTICE}\n\n{reply}"
 
+    database.add_all([
+        StoredChatMessage(patient_id=_current_user.id, role="user", content=request.message),
+        StoredChatMessage(patient_id=_current_user.id, role="assistant", content=reply, model=OLLAMA_MODEL),
+    ])
+    database.commit()
+
     return ChatResponse(
         reply=reply,
         emergency_detected=emergency_detected,
@@ -265,3 +276,26 @@ async def chat(
         disclaimer=STANDARD_DISCLAIMER,
         sources=sources,
     )
+
+
+@app.get("/api/v1/chat/history")
+def chat_history(
+    current_user: Annotated[User, Depends(get_current_user)],
+    database: Annotated[Session, Depends(get_db)],
+):
+    messages = database.scalars(
+        select(StoredChatMessage)
+        .where(StoredChatMessage.patient_id == current_user.id)
+        .order_by(StoredChatMessage.created_at.desc())
+        .limit(40)
+    ).all()
+    return [
+        {
+            "id": item.id,
+            "role": item.role,
+            "content": item.content,
+            "model": item.model,
+            "createdAt": item.created_at.isoformat(),
+        }
+        for item in reversed(messages)
+    ]

@@ -9,3 +9,7 @@ export function sendChatMessage(message, history = []) {
     body: JSON.stringify({ message, history })
   });
 }
+
+export function getChatHistory() {
+  return apiRequest("/chat/history");
+}

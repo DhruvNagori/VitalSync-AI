@@ -65,6 +65,20 @@ The lower validation loss shows that the optimization run learned the training
 format. It does **not** prove that answers are medically correct, safe, current,
 or better than the base model.
 
+## Base-versus-fine-tuned comparison
+
+On the 1,269-example held-out test set, loss decreased from 2.6779 to 1.1237 and
+perplexity decreased from 14.5539 to 3.0761. On a seeded 50-example generation
+sample, all four ROUGE measures increased. These results show better fit and
+reference-wording overlap.
+
+Manual inspection also found critical factual failures, including wrong disease
+genes, incorrect anatomy, invented prevalence values, and fabricated symptom
+tables. The raw outputs and detailed audit are in
+`ml/results/base_vs_finetuned/REVIEW.md`. The adapter must not be described as
+medically validated or deployed without retrieval, citations, and substantially
+stronger human evaluation.
+
 ## Required evaluation before reporting results
 
 Evaluate the original and fine-tuned models with identical decoding settings on

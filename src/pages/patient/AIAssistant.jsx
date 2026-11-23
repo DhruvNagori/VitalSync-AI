@@ -1,20 +1,24 @@
 
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import {
   BrainCircuit,
   Send,
   UserRound,
-  Sparkles
+  Sparkles,
+  CalendarPlus
 } from "lucide-react";
 
 import {
   PageHeader,
   Panel
 } from "../../components/patient/PageComponents";
-import { sendChatMessage } from "../../services/chatService";
+import { getChatHistory, sendChatMessage } from "../../services/chatService";
 
 function AIAssistant() {
+
+  const navigate = useNavigate();
 
   const [question, setQuestion] = useState("");
 
@@ -22,6 +26,20 @@ function AIAssistant() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    let active = true;
+    getChatHistory()
+      .then((items) => {
+        if (active) setMessages(items.map((item) => ({
+          id: item.id,
+          text: item.content,
+          sender: item.role === "user" ? "user" : "assistant"
+        })));
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -192,6 +210,21 @@ function AIAssistant() {
                           ))}
                         </div>
                       )}
+                      {message.sender === "assistant" && (
+                        <button
+                          type="button"
+                          className="feature-secondary-button"
+                          style={{ marginTop: 12 }}
+                          onClick={() => navigate("/patient/appointments", {
+                            state: {
+                              reason: `I would like to discuss this health question: ${priorHealthQuestion(messages, message.id)}`,
+                              chatSummary: message.text.slice(0, 3500)
+                            }
+                          })}
+                        >
+                          <CalendarPlus size={15} /> Discuss with a doctor
+                        </button>
+                      )}
                     </div>
 
                   </div>
@@ -256,3 +289,11 @@ function AIAssistant() {
 }
 
 export default AIAssistant;
+
+function priorHealthQuestion(messages, assistantId) {
+  const index = messages.findIndex((item) => item.id === assistantId);
+  for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+    if (messages[cursor].sender === "user") return messages[cursor].text.slice(0, 500);
+  }
+  return "My recent AI health conversation";
+}

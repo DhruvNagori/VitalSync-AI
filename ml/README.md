@@ -14,6 +14,7 @@ VitalSync academic health-information chatbot.
 | `artifacts/final_adapter/` | Fine-tuned PEFT/LoRA adapter and tokenizer files |
 | `results/trainer_state.json` | Saved step-by-step training and validation metrics |
 | `results/training_summary.json` | Human-readable run summary |
+| `results/base_vs_finetuned/` | Raw base-vs-adapter metrics, 50 paired answers, and correctness audit |
 | `gguf/Modelfile` | Qwen template used to import the merged GGUF into Ollama |
 | `gguf/README.md` | GGUF limitation, checksum, and export instructions |
 
@@ -58,7 +59,8 @@ prevention, diagnosis, medication, vaccine, or year-sensitive records remain in
 
 The current adapter is a smoke-run artifact. A lower language-model loss does not
 establish medical correctness, safety, or clinical usefulness. See the repository
-root `MODEL_CARD.md` for limitations and required evaluation.
+root `MODEL_CARD.md` and `results/base_vs_finetuned/REVIEW.md` for limitations and
+the observed factual failures.
 
 ## Reproduce in Colab
 
