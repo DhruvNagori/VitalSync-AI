@@ -12,10 +12,12 @@ information chatbot.
 ## Contents
 
 - [System overview](#system-overview)
+- [Architecture](#architecture)
 - [Features](#features)
 - [Technology stack](#technology-stack)
 - [Quick start on an Apple Silicon Mac](#quick-start-on-an-apple-silicon-mac)
 - [Fine-tuned model and outputs](#fine-tuned-model-and-outputs)
+- [Datasets and data governance](#datasets-and-data-governance)
 - [Trusted-source RAG](#trusted-source-rag)
 - [Database and authentication](#database-and-authentication)
 - [API endpoints](#api-endpoints)
@@ -48,6 +50,39 @@ FastAPI backend (Docker, port 8000)
 Ollama runs natively on macOS so the model can use Apple Metal. The web
 application, API, and database run through Docker Compose.
 
+## Architecture
+
+```mermaid
+flowchart LR
+    P[Patient portal] --> N[React + Nginx]
+    D[Doctor portal] --> N
+    N -->|REST /api/v1| API[FastAPI]
+    API --> AUTH[Authentication and role checks]
+    API --> CARE[Care workflow services]
+    API --> SAFE[Emergency phrase check]
+    SAFE --> RET[Lexical trusted-source retrieval]
+    RET -->|matched chunks| OLLAMA[Ollama + fine-tuned Qwen3-4B]
+    RET -->|no match| FALLBACK[Scope-limited response]
+    AUTH --> DB[(PostgreSQL)]
+    CARE --> DB
+    RET --> DB
+    OLLAMA --> API
+    API --> DB
+```
+
+The two medical-data paths have different purposes:
+
+1. **Fine-tuning path:** cleaned MedQuAD question-answer pairs teach the model
+   response style and general health-information patterns. The model weights do
+   not act as a reliable or up-to-date medical database.
+2. **RAG path:** a small, separately reviewed collection of government health
+   summaries is retrieved at request time. These chunks ground the answer and
+   produce visible, persistent citations.
+
+Emergency phrase detection runs before retrieval or generation. If retrieval
+finds no sufficiently relevant reviewed source, the backend does not call the
+model and returns a scope-limited response instead.
+
 ## Features
 
 ### Patient portal
@@ -63,7 +98,8 @@ application, API, and database run through Docker Compose.
 - Local AI health-information assistant with conversation history.
 - Strict trusted-source RAG with persisted citations and an unsupported-topic fallback.
 - Deterministic emergency-message fallback and visible safety notices.
-- Trusted NIH source links for the currently grounded iron-deficiency topic.
+- Clickable source links from the NIH, CDC, NIDDK, NHLBI, and MedlinePlus
+  knowledge collection.
 
 ### Doctor portal
 
@@ -233,6 +269,70 @@ The split is grouped by medical `Focus`, with zero Focus overlap among training,
 validation, and test data. Treatment, prevention, diagnosis, medication, vaccine,
 and year-sensitive records are retained in `ml/dataset/review_required.jsonl`.
 
+## Datasets and data governance
+
+### MedQuAD fine-tuning dataset
+
+The supervised fine-tuning data is derived from **MedQuAD**, a collection of
+medical question-answer pairs assembled from public NIH and other U.S.
+government health-information websites. The repository stores the processed
+JSONL outputs and source metadata, not a claim that every original answer is
+clinically current.
+
+The cleaning pipeline in `ml/scripts/prepare_medquad.py` applies these rules:
+
+1. Remove empty answers.
+2. Remove answers identical to their question.
+3. Remove short question-like answers ending in `?`.
+4. Remove “These resources address...” placeholders.
+5. Remove link-dependent answers whose content is unavailable locally.
+6. Deduplicate normalized question-answer pairs.
+7. Route treatment, prevention, and diagnosis records to manual review.
+8. Route records containing years, medications, or vaccines to manual review.
+9. Group-split by medical `Focus` to prevent topic leakage.
+10. Preserve source URL, source collection, Focus, and question type as metadata.
+
+| Processed file | Records | Use |
+|---|---:|---|
+| `ml/dataset/train.jsonl` | 9,722 | Approved QLoRA training split |
+| `ml/dataset/valid.jsonl` | 1,203 | Validation during training |
+| `ml/dataset/test.jsonl` | 1,269 | Untouched grouped evaluation split |
+| `ml/dataset/review_required.jsonl` | 2,939 | Higher-risk records excluded pending review |
+| `ml/dataset/summary.json` | — | Cleaning counts, source counts, and leakage check |
+
+The 12,194 safe records originate from these MedQuAD source collections:
+
+| Source collection | Safe records |
+|---|---:|
+| GARD | 4,300 |
+| Genetics Home Reference (GHR) | 4,209 |
+| MedlinePlus Health Topics | 866 |
+| NINDS | 774 |
+| NIDDK | 704 |
+| Cancer.gov | 486 |
+| NIH Senior Health | 460 |
+| NHLBI | 296 |
+| CDC | 99 |
+
+The processed data is appropriate for a reproducible academic experiment, but
+dataset size alone does not establish correctness. The flagged queue still needs
+qualified manual review, and the untouched test split should remain excluded
+from training and prompt development.
+
+### Runtime RAG knowledge dataset
+
+The runtime knowledge base is independent of the MedQuAD training splits. It is
+stored in `backend/app/knowledge_seed.json` and currently contains nine locally
+written, reviewed summaries covering eight topic areas. Each record includes a
+canonical government URL, organization, stable identifier, review date, and
+retrieval keywords. The source pages come from NIH Office of Dietary
+Supplements, NHLBI, NIDDK, CDC, and NLM MedlinePlus.
+
+The application never inserts patient records, chatbot history, uploaded
+documents, or wearable readings into the shared medical knowledge collection.
+See [`docs/RAG.md`](docs/RAG.md) for the complete source inventory and review
+procedure.
+
 ### Current saved run
 
 The committed adapter is a smoke-test result:
@@ -266,6 +366,13 @@ fine-tuned model. The initial collection covers eight common topics using nine
 NIH, CDC, NIDDK, NHLBI, and MedlinePlus pages. Responses display source links and
 persist citations with chat history. If no reviewed evidence matches, the API
 returns a scope-limited response without asking the model to guess.
+
+At backend startup, the JSON knowledge collection is idempotently seeded into
+PostgreSQL. Retrieval uses a dependency-free TF/IDF-like lexical score with
+keyword and title boosts, an absolute relevance floor, and a relative cutoff to
+discard weak secondary matches. Retrieved chunks are labelled `[S1]`, `[S2]`,
+and so on. The backend validates those labels and uses a deterministic cited
+summary if the generated response does not cite its evidence correctly.
 
 See [`docs/RAG.md`](docs/RAG.md) for the architecture, complete source inventory,
 strict-grounding behavior, and the process for adding reviewed sources.
@@ -365,6 +472,8 @@ ai_based_health_monitoring_system/
 │   │   ├── domain_routes.py       # Care, wearable, document, and messaging APIs
 │   │   ├── main.py                # Chat API and safety/grounding
 │   │   ├── models.py              # PostgreSQL healthcare domain models
+│   │   ├── rag.py                 # Local trusted-source retrieval
+│   │   ├── knowledge_seed.json     # Reviewed runtime RAG summaries
 │   │   ├── schemas.py             # API schemas
 │   │   └── security.py            # Argon2id and tokens
 │   ├── Dockerfile
@@ -377,6 +486,7 @@ ai_based_health_monitoring_system/
 │   ├── results/                   # Training outputs
 │   └── scripts/                   # Dataset preparation
 ├── model/                         # Application Modelfile example
+├── docs/RAG.md                    # RAG architecture and source inventory
 ├── public/
 ├── src/                           # React application
 ├── compose.yaml
@@ -403,7 +513,10 @@ The implementation has been checked with:
 - Patient-to-doctor workflow: symptoms, simulated wearable sync, alerts,
   consent snapshot, review, note, care plan, and message.
 - Emergency fallback and disclaimer-only response retry.
-- NIH-grounded iron-deficiency response with source links.
+- Supported-topic RAG answers, unsupported-topic fallback, citation validation,
+  and citation restoration from chat history.
+- Retrieval checks for iron deficiency, hypertension, diabetes, asthma, stroke,
+  heart attack, dehydration, and the common cold.
 - Adapter reconstruction and SHA-256 verification.
 
 Synthetic accounts created during testing were removed.
@@ -412,8 +525,14 @@ Synthetic accounts created during testing were removed.
 
 - The committed adapter is a smoke-run model trained on 1,000 examples.
 - A 4B model can produce confident but incorrect health information.
-- Only iron deficiency currently has a reviewed, source-linked grounding rule;
-  full trusted-document RAG is not implemented for every topic.
+- The reviewed RAG collection contains only nine source chunks across eight
+  topic areas; questions outside that scope receive a limited response.
+- Retrieval is lexical rather than embedding-based and may miss unfamiliar
+  synonyms or differently phrased questions.
+- Knowledge summaries are reviewed local snapshots and do not refresh
+  automatically when a source page changes.
+- A valid citation label does not prove that every generated sentence is fully
+  entailed by its source.
 - Training loss does not establish medical accuracy.
 - Doctor verification has no administrative workflow yet.
 - Smart-band readings and alerts are simulated; there is no Bluetooth or
