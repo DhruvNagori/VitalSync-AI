@@ -36,7 +36,20 @@ The patient-facing interface includes a health overview, symptom recording, heal
 
 The doctor-facing interface includes appointment request management, patient workspaces, consent-based health information, consultation notes, care plans, messaging, doctor profile settings, and patient insights.
 
-The current repository contains the React/Vite frontend. Some demonstration workflows use browser-side storage. A user interface should not be assumed to be connected to a production backend, database, or AI model unless that service is implemented and configured.
+The repository contains a React/Vite frontend and a small FastAPI service for the
+local academic health chatbot. The chatbot backend calls a fine-tuned Qwen3-4B
+GGUF model through native Ollama on macOS. Other demonstration workflows may
+still use browser-side storage and should not be assumed to have production
+backend or database integrations.
+
+The model's training details, dataset composition, evaluation status, and
+limitations are recorded in [MODEL_CARD.md](MODEL_CARD.md).
+
+The complete reproducibility package—including Colab notebooks, cleaned dataset
+splits, training metrics, tokenizer files, and the fine-tuned LoRA adapter split
+into GitHub-compatible chunks—is available under [`ml/`](ml/README.md). The 2.3 GiB GGUF is documented
+there but cannot be stored directly on GitHub because it exceeds GitHub's per-file
+limit; it can be regenerated from the included adapter.
 
 ## Features
 
@@ -203,6 +216,109 @@ Before adding a Geoapify placeholder to `.env.example`, check `src/services/hosp
 The file must be named exactly `.env.example` (without a trailing colon). Do not rename it to `.env`; the example file is intended to be safe to publish.
 
 ## Run and build
+
+### Run the complete chatbot with Docker on an Apple Silicon Mac
+
+Ollama should run natively on macOS so it can use Apple Metal. Docker runs the
+frontend and FastAPI backend. The backend connects to native Ollama through
+`host.docker.internal`.
+
+1. Install and start Ollama for macOS.
+2. Export the fine-tuned adapter as a merged `Q4_K_M` GGUF in Colab.
+3. Create the Ollama model using the generated Modelfile. On this development
+   Mac, the current export is located in
+   `/Users/sohitkumar/Downloads/medquad-qwen3-4b_gguf`:
+
+```bash
+ollama create vitalsync-medquad-qwen3-4b \
+  -f /Users/sohitkumar/Downloads/medquad-qwen3-4b_gguf/Modelfile
+ollama list
+ollama run vitalsync-medquad-qwen3-4b "What is hypertension?"
+```
+
+The supplied Modelfile references `Qwen3-4B.Q4_K_M.gguf` in the same directory
+and preserves the Qwen chat template produced during export. For another machine,
+copy both files together and update the absolute path in the command.
+
+4. Build and start the web application:
+
+```bash
+docker compose up --build
+```
+
+Open `http://localhost:8080` and navigate to the patient AI Assistant.
+
+### Persistent patient and doctor accounts
+
+Docker Compose runs PostgreSQL as the internal `database` service. Registration
+and login use the FastAPI endpoints below:
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `POST` | `/api/v1/auth/register` | Create a patient or doctor account |
+| `POST` | `/api/v1/auth/login` | Verify credentials and issue a signed access token |
+| `GET` | `/api/v1/auth/me` | Restore the authenticated user session |
+
+The `users` table stores the shared account fields (`name`, `email`, `phone`,
+`role`) plus patient date of birth or doctor specialization and professional
+registration number. Passwords are never stored directly; the backend stores an
+Argon2id hash. Email addresses and doctor registration numbers are unique.
+
+PostgreSQL data is persisted in the named Docker volume
+`vitalsync-ai_postgres_data`, so ordinary container rebuilds and
+`docker compose down` do not remove accounts. Do not run
+`docker compose down --volumes` unless you intentionally want to delete the
+database.
+
+For local configuration, copy the provided template and replace its development
+credentials:
+
+```bash
+cp env.example .env
+openssl rand -hex 32
+```
+
+Use the generated value for `JWT_SECRET` and set a separate strong
+`POSTGRES_PASSWORD`, then rebuild:
+
+```bash
+docker compose up -d --build
+```
+
+Inspect registered accounts without displaying password hashes:
+
+```bash
+docker compose exec database psql -U vitalsync -d vitalsync \
+  -c "SELECT id, name, email, role, is_verified, created_at FROM users;"
+```
+
+The current token storage and automatic schema creation are appropriate for an
+academic local demonstration. Before a production or real-patient deployment,
+use HTTPS, secure HTTP-only authentication cookies, managed secrets, database
+migrations, backups, audit logs, explicit consent/retention policies, and the
+health-data security controls required in the deployment jurisdiction.
+
+Useful checks:
+
+```bash
+curl http://localhost:11434/api/tags
+curl http://localhost:8000/api/v1/health
+docker compose logs -f backend
+```
+
+Stop the application with:
+
+```bash
+docker compose down
+```
+
+The model is intentionally outside Docker on macOS. Ollama's documented Docker
+image is CPU-only unless a supported GPU device is passed through; its documented
+GPU container paths target NVIDIA, AMD, or Vulkan devices rather than Apple Metal.
+
+If the backend cannot reach native Ollama, confirm the Ollama application is
+running and that `http://host.docker.internal:11434/api/tags` is reachable from a
+Docker container. Do not expose port 11434 to a public network.
 
 ### Start the frontend development server
 

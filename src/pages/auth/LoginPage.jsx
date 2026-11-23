@@ -19,6 +19,7 @@ function LoginPage() {
 
   const [errors, setErrors] = useState({});
   const [message, setMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   function validateForm() {
     const newErrors = {};
@@ -40,7 +41,7 @@ function LoginPage() {
     return Object.keys(newErrors).length === 0;
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
 
     setMessage("");
@@ -49,7 +50,9 @@ function LoginPage() {
       return;
     }
 
-    const result = login(email, password);
+    setIsSubmitting(true);
+    const result = await login(email, password, rememberMe);
+    setIsSubmitting(false);
 
     if (!result.success) {
       setMessage(result.message);
@@ -169,8 +172,9 @@ function LoginPage() {
         <button
           type="submit"
           className="auth-submit-button"
+          disabled={isSubmitting}
         >
-          Sign In
+          {isSubmitting ? "Signing In…" : "Sign In"}
           <ArrowRight size={18} />
         </button>
 

@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   BrainCircuit,
@@ -10,17 +10,24 @@ import {
 
 import {
   PageHeader,
-  Panel,
-  DemoNotice
+  Panel
 } from "../../components/patient/PageComponents";
+import { sendChatMessage } from "../../services/chatService";
 
 function AIAssistant() {
 
   const [question, setQuestion] = useState("");
 
   const [messages, setMessages] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const messagesEndRef = useRef(null);
 
-  function handleSubmit(e) {
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isLoading]);
+
+  async function handleSubmit(e) {
 
     e.preventDefault();
 
@@ -28,16 +35,41 @@ function AIAssistant() {
       return;
     }
 
-    setMessages((previous) => [
-      ...previous,
-      {
-        id: Date.now(),
-        text: question.trim(),
-        sender: "user"
-      }
-    ]);
+    const submittedQuestion = question.trim();
+    const priorMessages = messages;
+    const userMessage = {
+      id: crypto.randomUUID(),
+      text: submittedQuestion,
+      sender: "user"
+    };
 
+    setMessages([...priorMessages, userMessage]);
     setQuestion("");
+    setError("");
+    setIsLoading(true);
+
+    try {
+      const history = priorMessages.map((message) => ({
+        role: message.sender === "user" ? "user" : "assistant",
+        content: message.text
+      }));
+      const result = await sendChatMessage(submittedQuestion, history);
+
+      setMessages((previous) => [
+        ...previous,
+        {
+          id: crypto.randomUUID(),
+          text: result.reply,
+          sender: "assistant",
+          emergencyDetected: result.emergency_detected,
+          sources: result.sources || []
+        }
+      ]);
+    } catch (requestError) {
+      setError(requestError.message || "The assistant could not answer right now.");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -48,8 +80,6 @@ function AIAssistant() {
         title="AI Health Assistant"
         description="A dedicated space for healthcare-related questions and personalized health information."
       />
-
-      <DemoNotice />
 
       <section className="feature-section">
 
@@ -65,11 +95,11 @@ function AIAssistant() {
 
               <div>
                 <h3>VitalSync AI Assistant</h3>
-                <p>Medical knowledge assistant · Preview</p>
+                <p>Fine-tuned Qwen3-4B · Local inference</p>
               </div>
 
               <span className="feature-status">
-                RAG Integration Pending
+                Local model
               </span>
 
             </div>
@@ -87,9 +117,9 @@ function AIAssistant() {
 
                   <p>
                     Ask a healthcare-related question.
-                    The connected RAG system will eventually
-                    use supported medical knowledge and your
-                    authorized health information to respond.
+                    Ask for general educational health information.
+                    Do not use this assistant for diagnosis,
+                    treatment decisions, or emergencies.
                   </p>
 
                   <div className="ai-suggestions">
@@ -147,6 +177,21 @@ function AIAssistant() {
 
                     <div className="ai-message-content">
                       {message.text}
+                      {message.sources?.length > 0 && (
+                        <div className="ai-message-sources">
+                          <strong>Trusted sources</strong>
+                          {message.sources.map((source) => (
+                            <a
+                              href={source.url}
+                              key={source.url}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              {source.title}
+                            </a>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                   </div>
@@ -154,6 +199,19 @@ function AIAssistant() {
                 ))
 
               )}
+
+              {isLoading && (
+                <div className="ai-chat-message assistant-message">
+                  <div className="ai-message-icon">
+                    <BrainCircuit size={18} />
+                  </div>
+                  <div className="ai-message-content ai-message-loading">
+                    Thinking…
+                  </div>
+                </div>
+              )}
+
+              <div ref={messagesEndRef} />
 
             </div>
 
@@ -172,7 +230,7 @@ function AIAssistant() {
 
               <button
                 type="submit"
-                disabled={!question.trim()}
+                disabled={!question.trim() || isLoading}
                 aria-label="Send message"
               >
                 <Send size={19} />
@@ -180,9 +238,11 @@ function AIAssistant() {
 
             </form>
 
+            {error && <p className="ai-chat-error" role="alert">{error}</p>}
+
             <p className="ai-chat-disclaimer">
-              Preview only. Messages are not sent to an AI model.
-              Do not enter real medical or personal information.
+              Academic demonstration only. Not a medical diagnosis or a
+              substitute for professional care. Do not enter identifying data.
             </p>
 
           </div>
