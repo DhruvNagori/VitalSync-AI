@@ -16,6 +16,7 @@ information chatbot.
 - [Technology stack](#technology-stack)
 - [Quick start on an Apple Silicon Mac](#quick-start-on-an-apple-silicon-mac)
 - [Fine-tuned model and outputs](#fine-tuned-model-and-outputs)
+- [Trusted-source RAG](#trusted-source-rag)
 - [Database and authentication](#database-and-authentication)
 - [API endpoints](#api-endpoints)
 - [Development commands](#development-commands)
@@ -36,8 +37,9 @@ React frontend + Nginx (Docker, port 8080)
   │ /api/v1
   ▼
 FastAPI backend (Docker, port 8000)
-  ├── PostgreSQL (Docker volume)
-  └── Ollama API via host.docker.internal:11434
+  ├── PostgreSQL (care data + reviewed RAG chunks + citations)
+  ├── strict local lexical retrieval
+  └── grounded prompt to Ollama via host.docker.internal:11434
           │
           ▼
       Fine-tuned Qwen3-4B Q4_K_M GGUF
@@ -59,6 +61,7 @@ application, API, and database run through Docker Compose.
 - Persistent doctor messaging and care-plan updates.
 - Hospital discovery and clearly labelled simulated-device interfaces.
 - Local AI health-information assistant with conversation history.
+- Strict trusted-source RAG with persisted citations and an unsupported-topic fallback.
 - Deterministic emergency-message fallback and visible safety notices.
 - Trusted NIH source links for the currently grounded iron-deficiency topic.
 
@@ -256,6 +259,17 @@ medical correctness or clinical safety.
 | `ml/scripts/prepare_medquad.py` | Dataset cleaning and splitting pipeline |
 | `ml/gguf/` | Ollama Modelfile and GGUF documentation |
 
+## Trusted-source RAG
+
+The chatbot retrieves reviewed evidence from PostgreSQL before calling the local
+fine-tuned model. The initial collection covers eight common topics using nine
+NIH, CDC, NIDDK, NHLBI, and MedlinePlus pages. Responses display source links and
+persist citations with chat history. If no reviewed evidence matches, the API
+returns a scope-limited response without asking the model to guess.
+
+See [`docs/RAG.md`](docs/RAG.md) for the architecture, complete source inventory,
+strict-grounding behavior, and the process for adding reviewed sources.
+
 ## Database and authentication
 
 PostgreSQL runs as the internal `database` service. Account data persists in the
@@ -285,6 +299,7 @@ Do not use `--volumes` unless deletion is intentional.
 | `GET` | `/api/v1/auth/me` | Bearer | Restore current account |
 | `POST` | `/api/v1/chat` | Bearer | Send chatbot request |
 | `GET` | `/api/v1/chat/history` | Bearer | Load persisted chatbot history |
+| `GET` | `/api/v1/knowledge/sources` | Bearer | List active trusted RAG sources |
 | `GET/POST` | `/api/v1/symptoms` | Patient | List or create symptom records |
 | `GET` | `/api/v1/wearables` | Patient | Read demo-band state, readings, and alerts |
 | `POST` | `/api/v1/wearables/device` | Patient | Configure the simulated band |

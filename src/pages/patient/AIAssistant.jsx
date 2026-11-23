@@ -14,7 +14,7 @@ import {
   PageHeader,
   Panel
 } from "../../components/patient/PageComponents";
-import { getChatHistory, sendChatMessage } from "../../services/chatService";
+import { getChatHistory, getKnowledgeSources, sendChatMessage } from "../../services/chatService";
 
 function AIAssistant() {
 
@@ -25,17 +25,20 @@ function AIAssistant() {
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [knowledgeCount, setKnowledgeCount] = useState(0);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
     let active = true;
-    getChatHistory()
-      .then((items) => {
+    Promise.all([getChatHistory(), getKnowledgeSources()])
+      .then(([items, knowledge]) => {
         if (active) setMessages(items.map((item) => ({
           id: item.id,
           text: item.content,
-          sender: item.role === "user" ? "user" : "assistant"
+          sender: item.role === "user" ? "user" : "assistant",
+          sources: item.sources || []
         })));
+        if (active) setKnowledgeCount(knowledge.count || 0);
       })
       .catch(() => {});
     return () => { active = false; };
@@ -80,7 +83,9 @@ function AIAssistant() {
           text: result.reply,
           sender: "assistant",
           emergencyDetected: result.emergency_detected,
-          sources: result.sources || []
+          sources: result.sources || [],
+          ragUsed: result.rag_used,
+          knowledgeScopeLimited: result.knowledge_scope_limited
         }
       ]);
     } catch (requestError) {
@@ -113,11 +118,11 @@ function AIAssistant() {
 
               <div>
                 <h3>VitalSync AI Assistant</h3>
-                <p>Fine-tuned Qwen3-4B · Local inference</p>
+                <p>Fine-tuned Qwen3-4B · Trusted-source RAG · Local inference</p>
               </div>
 
               <span className="feature-status">
-                Local model
+                RAG · {knowledgeCount || "…"} sources
               </span>
 
             </div>
@@ -134,8 +139,8 @@ function AIAssistant() {
                   <h2>How can I help you today?</h2>
 
                   <p>
-                    Ask a healthcare-related question.
-                    Ask for general educational health information.
+                    Ask about iron deficiency, blood pressure, diabetes,
+                    asthma, stroke, heart attack, dehydration, or the common cold.
                     Do not use this assistant for diagnosis,
                     treatment decisions, or emergencies.
                   </p>
@@ -144,26 +149,26 @@ function AIAssistant() {
 
                     <button
                       onClick={() =>
-                        setQuestion("Help me understand my health report.")
+                        setQuestion("How can iron deficiency be evaluated and improved safely?")
                       }
                     >
-                      Understand a health report
+                      Understand iron deficiency
                     </button>
 
                     <button
                       onClick={() =>
-                        setQuestion("Explain common health measurements.")
+                        setQuestion("What healthy habits can help manage high blood pressure?")
                       }
                     >
-                      Understand health measurements
+                      Manage blood pressure
                     </button>
 
                     <button
                       onClick={() =>
-                        setQuestion("What information should I discuss with my doctor?")
+                        setQuestion("What are the warning signs of a stroke?")
                       }
                     >
-                      Prepare for a doctor visit
+                      Recognize stroke warning signs
                     </button>
 
                   </div>
@@ -205,9 +210,15 @@ function AIAssistant() {
                               target="_blank"
                               rel="noreferrer"
                             >
-                              {source.title}
+                              [{source.label}] {source.title}
+                              {source.organization ? ` · ${source.organization}` : ""}
                             </a>
                           ))}
+                        </div>
+                      )}
+                      {message.knowledgeScopeLimited && (
+                        <div className="care-badge warning" style={{ marginTop: 12 }}>
+                          No reviewed source match · model not used
                         </div>
                       )}
                       {message.sender === "assistant" && (

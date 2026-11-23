@@ -208,3 +208,34 @@ class ChatMessage(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
+
+
+class ChatCitation(Base):
+    __tablename__ = "chat_citations"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    message_id: Mapped[int] = mapped_column(ForeignKey("chat_messages.id"), index=True)
+    source_label: Mapped[str] = mapped_column(String(20))
+    title: Mapped[str] = mapped_column(String(240))
+    source_url: Mapped[str] = mapped_column(String(800))
+    source_organization: Mapped[str] = mapped_column(String(120))
+    retrieval_score: Mapped[float] = mapped_column(Float)
+
+
+class KnowledgeChunk(Base):
+    __tablename__ = "knowledge_chunks"
+    __table_args__ = (
+        UniqueConstraint("document_slug", "chunk_key", name="uq_knowledge_chunk"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    document_slug: Mapped[str] = mapped_column(String(120), index=True)
+    chunk_key: Mapped[str] = mapped_column(String(120))
+    title: Mapped[str] = mapped_column(String(240))
+    source_organization: Mapped[str] = mapped_column(String(120))
+    source_url: Mapped[str] = mapped_column(String(800))
+    source_updated: Mapped[str] = mapped_column(String(40), default="")
+    reviewed_at: Mapped[str] = mapped_column(String(40), default="")
+    keywords: Mapped[str] = mapped_column(Text, default="")
+    content: Mapped[str] = mapped_column(Text)
+    active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)

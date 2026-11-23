@@ -13,3 +13,7 @@ export function sendChatMessage(message, history = []) {
 export function getChatHistory() {
   return apiRequest("/chat/history");
 }
+
+export function getKnowledgeSources() {
+  return apiRequest("/knowledge/sources");
+}

@@ -1,4 +1,5 @@
 import os
+import re
 from contextlib import asynccontextmanager
 from typing import Literal
 from typing import Annotated
@@ -12,8 +13,9 @@ from sqlalchemy.orm import Session
 
 from .auth_routes import router as auth_router
 from .domain_routes import router as domain_router
-from .database import Base, engine, get_db
-from .models import ChatMessage as StoredChatMessage, User
+from .database import Base, SessionLocal, engine, get_db
+from .models import ChatCitation, ChatMessage as StoredChatMessage, KnowledgeChunk, User
+from .rag import build_rag_context, retrieve_knowledge, seed_knowledge
 from .security import get_current_user
 
 
@@ -27,10 +29,10 @@ STANDARD_DISCLAIMER = (
     "a qualified healthcare professional."
 )
 
-SYSTEM_PROMPT = """You are VitalSync, an educational health-information assistant.
-Answer the user's health question directly before giving cautions. Provide clear,
-useful general information and specific examples when appropriate. Use short
-paragraphs or bullet points when they improve readability.
+SYSTEM_PROMPT = """You are VitalSync, an educational health-information assistant
+using retrieval-augmented generation. Answer only from the supplied trusted
+evidence. Do not use remembered medical facts that are absent from the evidence.
+Use short paragraphs or bullets when they improve readability.
 
 Do not diagnose the user, claim certainty from incomplete information, prescribe
 personalized treatment, or give personalized medication or supplement dosages.
@@ -38,8 +40,11 @@ Explain when evaluation by a qualified healthcare professional is important. For
 urgent or potentially life-threatening symptoms, advise immediate professional
 care.
 
-Do not output a generic medical disclaimer. The application displays its standard
-disclaimer separately. Never respond with only a disclaimer.
+Add an inline citation such as [S1] after every paragraph containing factual
+medical claims. Cite only source labels supplied in the evidence. If the evidence
+does not answer part of the question, say that the reviewed library does not cover
+it. Do not invent a citation. Do not output a generic disclaimer because the
+application displays it separately.
 """
 
 EMERGENCY_PHRASES = {
@@ -51,6 +56,11 @@ EMERGENCY_PHRASES = {
     "overdose",
     "having a seizure",
     "signs of stroke",
+    "face drooping",
+    "arm weakness",
+    "slurred speech",
+    "chest pressure",
+    "fainting",
     "kill myself",
     "suicide",
 }
@@ -89,49 +99,17 @@ class ChatResponse(BaseModel):
     emergency_detected: bool
     model: str
     disclaimer: str
-    sources: list[dict[str, str]] = Field(default_factory=list)
-
-
-def trusted_context_for(question: str) -> tuple[str | None, list[dict[str, str]]]:
-    normalized = question.casefold()
-    mentions_iron = "iron" in normalized
-    mentions_low_or_deficiency = "defic" in normalized or "low iron" in normalized
-    if not (mentions_iron and mentions_low_or_deficiency):
-        return None, []
-
-    context = """Trusted NIH context for this answer:
-- Iron deficiency should be confirmed and its cause assessed. Clinicians commonly
-  use blood tests such as a complete blood count, hemoglobin, iron, and ferritin.
-- Causes can include blood loss, inadequate dietary iron, or difficulty absorbing iron.
-- Food sources include lean meat, seafood, poultry, iron-fortified cereals and
-  breads, white beans, lentils, kidney beans, peas, spinach, nuts, and some dried fruit.
-- Vitamin C foods such as citrus fruit, strawberries, sweet peppers, tomatoes, and
-  broccoli can improve absorption of iron from plant foods.
-- Iron supplements may be recommended after evaluation, but excess iron can be
-  harmful and supplements can cause side effects. Do not provide a dose.
-- Treatment depends on the cause and severity. Do not suggest blood transfusion as
-  routine general advice for improving iron deficiency.
-- Advise urgent care for chest pain, severe trouble breathing, fainting, or signs of
-  significant bleeding. Other symptoms should prompt appropriate clinical review.
-Use only this context for specific medical claims in this answer. Give practical
-general steps and explain why professional evaluation matters.
-"""
-    sources = [
-        {
-            "title": "NIH Office of Dietary Supplements: Iron",
-            "url": "https://ods.od.nih.gov/factsheets/Iron-Consumer/",
-        },
-        {
-            "title": "NHLBI: Iron-Deficiency Anemia",
-            "url": "https://www.nhlbi.nih.gov/health/anemia/iron-deficiency-anemia",
-        },
-    ]
-    return context, sources
+    sources: list[dict] = Field(default_factory=list)
+    rag_used: bool = False
+    retrieval_score: float | None = None
+    knowledge_scope_limited: bool = False
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    with SessionLocal() as database:
+        seed_knowledge(database)
     yield
 
 
@@ -183,10 +161,57 @@ async def chat(
         phrase in normalized_question for phrase in EMERGENCY_PHRASES
     )
 
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-    trusted_context, sources = trusted_context_for(request.message)
-    if trusted_context:
-        messages.append({"role": "system", "content": trusted_context})
+    retrieved = retrieve_knowledge(database, request.message)
+    sources = [
+        {
+            "label": f"S{index}",
+            "title": item["title"],
+            "organization": item["organization"],
+            "url": item["url"],
+            "score": item["score"],
+            "sourceUpdated": item["sourceUpdated"],
+            "reviewedAt": item["reviewedAt"],
+        }
+        for index, item in enumerate(retrieved, start=1)
+    ]
+
+    if not retrieved:
+        reply = (
+            "I don't have reviewed source material for that question in the current "
+            "trusted library, so I won't guess. The available topics are iron "
+            "deficiency, high blood pressure, diabetes, asthma, stroke warning signs, "
+            "heart attack warning signs, dehydration, and the common cold. Please ask "
+            "about one of those topics or discuss the question with a qualified "
+            "healthcare professional."
+        )
+        if emergency_detected:
+            reply = f"{EMERGENCY_NOTICE}\n\n{reply}"
+        database.add_all([
+            StoredChatMessage(patient_id=_current_user.id, role="user", content=request.message),
+            StoredChatMessage(patient_id=_current_user.id, role="assistant", content=reply, model=OLLAMA_MODEL),
+        ])
+        database.commit()
+        return ChatResponse(
+            reply=reply,
+            emergency_detected=emergency_detected,
+            model=OLLAMA_MODEL,
+            disclaimer=STANDARD_DISCLAIMER,
+            sources=[],
+            rag_used=False,
+            retrieval_score=None,
+            knowledge_scope_limited=True,
+        )
+
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {
+            "role": "system",
+            "content": (
+                "Trusted evidence follows. Treat it as the complete factual boundary "
+                "for this answer.\n\n" + build_rag_context(retrieved)
+            ),
+        },
+    ]
     messages.extend(
         message.model_dump() for message in request.history[-MAX_HISTORY_MESSAGES:]
     )
@@ -252,20 +277,50 @@ async def chat(
     if not reply:
         raise HTTPException(status_code=502, detail="The model returned an empty response.")
 
-    if trusted_context:
-        reply = (
-            f"{reply}\n\nBecause low iron can result from blood loss or problems "
-            "absorbing iron, a healthcare professional can confirm it with appropriate "
-            "blood tests and investigate the cause. Do not start a high-dose iron "
-            "supplement without professional guidance; excess iron can be harmful."
+    valid_citations = {f"S{index}" for index in range(1, len(sources) + 1)}
+    cited_labels = set(re.findall(r"\[(S\d+)\]", reply))
+    if not cited_labels or not cited_labels.issubset(valid_citations):
+        citation_retry = [*messages]
+        citation_retry[-1] = {
+            "role": "user",
+            "content": (
+                f"{request.message}\n\nRewrite the answer using only the supplied "
+                "evidence. Put a valid inline citation such as [S1] after every "
+                "paragraph containing a medical claim."
+            ),
+        }
+        try:
+            reply = await request_model(citation_retry)
+        except httpx.HTTPError:
+            pass
+        cited_labels = set(re.findall(r"\[(S\d+)\]", reply))
+    if not cited_labels or not cited_labels.issubset(valid_citations):
+        reply = "Here is the reviewed information available for this question:\n\n" + "\n\n".join(
+            f"{item['content']} [S{index}]"
+            for index, item in enumerate(retrieved, start=1)
         )
 
     if emergency_detected:
         reply = f"{EMERGENCY_NOTICE}\n\n{reply}"
 
+    user_message = StoredChatMessage(
+        patient_id=_current_user.id, role="user", content=request.message
+    )
+    assistant_message = StoredChatMessage(
+        patient_id=_current_user.id, role="assistant", content=reply, model=OLLAMA_MODEL
+    )
+    database.add_all([user_message, assistant_message])
+    database.flush()
     database.add_all([
-        StoredChatMessage(patient_id=_current_user.id, role="user", content=request.message),
-        StoredChatMessage(patient_id=_current_user.id, role="assistant", content=reply, model=OLLAMA_MODEL),
+        ChatCitation(
+            message_id=assistant_message.id,
+            source_label=source["label"],
+            title=source["title"],
+            source_url=source["url"],
+            source_organization=source["organization"],
+            retrieval_score=source["score"],
+        )
+        for source in sources
     ])
     database.commit()
 
@@ -275,6 +330,9 @@ async def chat(
         model=OLLAMA_MODEL,
         disclaimer=STANDARD_DISCLAIMER,
         sources=sources,
+        rag_used=True,
+        retrieval_score=max(item["score"] for item in retrieved),
+        knowledge_scope_limited=False,
     )
 
 
@@ -289,6 +347,20 @@ def chat_history(
         .order_by(StoredChatMessage.created_at.desc())
         .limit(40)
     ).all()
+    citations = database.scalars(
+        select(ChatCitation).where(
+            ChatCitation.message_id.in_([item.id for item in messages])
+        )
+    ).all() if messages else []
+    citations_by_message: dict[int, list[dict]] = {}
+    for citation in citations:
+        citations_by_message.setdefault(citation.message_id, []).append({
+            "label": citation.source_label,
+            "title": citation.title,
+            "url": citation.source_url,
+            "organization": citation.source_organization,
+            "score": citation.retrieval_score,
+        })
     return [
         {
             "id": item.id,
@@ -296,6 +368,33 @@ def chat_history(
             "content": item.content,
             "model": item.model,
             "createdAt": item.created_at.isoformat(),
+            "sources": citations_by_message.get(item.id, []),
         }
         for item in reversed(messages)
     ]
+
+
+@app.get("/api/v1/knowledge/sources")
+def knowledge_sources(
+    _current_user: Annotated[User, Depends(get_current_user)],
+    database: Annotated[Session, Depends(get_db)],
+):
+    chunks = database.scalars(
+        select(KnowledgeChunk)
+        .where(KnowledgeChunk.active.is_(True))
+        .order_by(KnowledgeChunk.source_organization, KnowledgeChunk.title)
+    ).all()
+    seen = set()
+    results = []
+    for chunk in chunks:
+        if chunk.source_url in seen:
+            continue
+        seen.add(chunk.source_url)
+        results.append({
+            "title": chunk.title,
+            "organization": chunk.source_organization,
+            "url": chunk.source_url,
+            "sourceUpdated": chunk.source_updated,
+            "reviewedAt": chunk.reviewed_at,
+        })
+    return {"count": len(results), "sources": results, "retrieval": "local lexical RAG"}

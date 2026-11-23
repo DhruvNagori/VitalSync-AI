@@ -101,7 +101,9 @@ clinical accuracy from training loss, ROUGE, BLEU, or semantic similarity alone.
 - A 4B model can produce convincing but incorrect statements.
 - Fine-tuning changes behavior and style but does not guarantee factual grounding.
 - The smoke run used only part of the available training data.
-- The system currently has no retrieval/citation layer.
+- The application includes a small strict RAG layer over nine reviewed government
+  health pages. Its coverage is intentionally limited and citations do not by
+  themselves prove answer entailment or medical correctness.
 - The keyword emergency guard is a fallback, not a validated triage system.
 - Conversation content is sent to the local model service; only synthetic or
   de-identified demonstration data should be entered.
