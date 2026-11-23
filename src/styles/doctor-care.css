@@ -1,0 +1,118 @@
+/* VitalSync AI - Doctor patient-care workspace additions */
+.doctor-care-back { margin-bottom: 18px; }
+.doctor-care-back a { display: inline-flex; align-items: center; gap: 7px; color: #0d9488; font-size: 13px; font-weight: 650; text-decoration: none; }
+.doctor-care-profile-grid { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 18px; }
+.doctor-care-profile-card { display: grid; grid-template-columns: 58px 1fr; align-content: start; gap: 12px; }
+.doctor-care-avatar { width: 54px; height: 54px; border-radius: 16px; background: #e5f7f3; color: #0d9488; display: grid; place-items: center; font-weight: 750; font-size: 18px; }
+.doctor-care-profile-card h2 { font-size: 18px; color: #173247; }
+.doctor-care-profile-card > div:nth-child(2) span { display: block; color: #8293a5; font-size: 12px; margin-top: 4px; }
+.doctor-care-contact-list { grid-column: 1 / -1; border-top: 1px solid #edf1f4; padding-top: 14px; display: grid; gap: 9px; }
+.doctor-care-contact-list p, .doctor-care-appointment span { display: flex; align-items: center; gap: 8px; color: #71849a; font-size: 12px; overflow-wrap: anywhere; }
+.doctor-care-appointment { display: grid; gap: 8px; padding: 12px 0; border-top: 1px solid #edf1f4; }
+.doctor-care-appointment strong { color: #173247; font-size: 13px; }
+.doctor-care-empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding: 28px 16px; color: #8293a5; }
+.doctor-care-empty svg { color: #0d9488; }
+.doctor-care-empty strong { color: #173247; }
+.doctor-care-empty p { max-width: 600px; font-size: 12px; line-height: 1.7; }
+.doctor-shared-summary { padding: 16px 0; border-bottom: 1px solid #edf1f4; }
+.doctor-shared-summary:last-child { border-bottom: 0; }
+.doctor-shared-summary > div { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; color: #0d9488; font-size: 12px; }
+.doctor-shared-summary > div span { color: #8293a5; }
+.doctor-shared-summary p { margin-top: 12px; white-space: pre-wrap; line-height: 1.75; font-size: 13px; color: #40566c; }
+.doctor-care-form { display: grid; gap: 10px; padding-bottom: 18px; border-bottom: 1px solid #edf1f4; }
+.doctor-care-form label { color: #40566c; font-size: 12px; font-weight: 650; }
+.doctor-care-form textarea, .doctor-care-form input { width: 100%; border: 1px solid #dfe7ed; border-radius: 9px; background: #fbfcfd; color: #173247; padding: 12px 13px; font: inherit; font-size: 13px; }
+.doctor-care-form textarea:focus, .doctor-care-form input:focus { outline: none; border-color: #0d9488; box-shadow: 0 0 0 3px rgba(13,148,136,.09); }
+.doctor-care-form .feature-primary-button { justify-self: start; }
+.doctor-care-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.doctor-care-form-grid > div { display: grid; gap: 8px; }
+.doctor-care-list { display: grid; gap: 0; }
+.doctor-care-entry { padding: 16px 0; border-bottom: 1px solid #edf1f4; }
+.doctor-care-entry:last-child { border-bottom: 0; }
+.doctor-care-entry p { white-space: pre-wrap; color: #40566c; font-size: 13px; line-height: 1.75; }
+.doctor-care-entry small { display: block; margin-top: 8px; color: #8293a5; font-size: 11px; }
+.doctor-care-entry-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
+.doctor-care-entry-heading strong { color: #173247; font-size: 14px; }
+.doctor-care-plan-actions { display: flex; gap: 8px; margin-top: 12px; }
+.doctor-care-muted { color: #8293a5; font-size: 12px; padding: 18px 0; }
+.doctor-care-feedback { margin-top: 18px; color: #0d9488; font-size: 12px; }
+.doctor-care-disclaimer { display: flex; align-items: flex-start; gap: 9px; margin-top: 20px; color: #8293a5; font-size: 11px; line-height: 1.7; }
+.doctor-care-disclaimer svg { flex-shrink: 0; color: #0d9488; }
+.doctor-sharing-field { border: 1px solid #dcefeb; border-radius: 10px; padding: 14px; background: #f8fcfb; }
+.doctor-sharing-consent { display: flex !important; flex-direction: row !important; align-items: flex-start; gap: 9px !important; line-height: 1.6; color: #40566c !important; }
+.doctor-sharing-consent input { width: 16px !important; margin-top: 2px; accent-color: #0d9488; }
+.doctor-open-patient-button { margin-top: 7px; }
+.doctor-patient-card-foot button { display: inline-flex; align-items: center; gap: 5px; border: 0; background: transparent; color: #0d9488; font-weight: 650; font-size: 11px; cursor: pointer; }
+@media (max-width: 800px) { .doctor-care-profile-grid { grid-template-columns: 1fr; } .doctor-care-form-grid { grid-template-columns: 1fr; } }
+
+
+/* Appointment health-data consent and doctor shared-record presentation */
+.doctor-sharing-field > strong { display: block; margin-bottom: 8px; }
+.doctor-sharing-field > p { margin: 0 0 12px; }
+.doctor-sharing-consent { display: flex; align-items: flex-start; gap: 10px; margin: 10px 0; line-height: 1.5; }
+.doctor-sharing-consent input { flex: 0 0 auto; margin-top: 4px; accent-color: #287fbd; }
+.doctor-sharing-consent span { display: grid; gap: 2px; }
+.doctor-sharing-consent small { display: block; color: #64748b; }
+.doctor-shared-document-picker { margin: 8px 0 14px 28px; padding: 12px; border: 1px solid #dbe5ef; border-radius: 12px; background: #f8fafc; }
+.doctor-document-option { padding: 8px 0; border-bottom: 1px solid #e2e8f0; }
+.doctor-document-option:last-child { border-bottom: 0; }
+.doctor-sharing-privacy-note { margin-top: 14px; padding: 12px 14px; border-radius: 10px; background: #f1f5f9; color: #475569; font-size: .9rem; line-height: 1.55; }
+.doctor-shared-data-block { margin-top: 18px; padding-top: 14px; border-top: 1px solid #e2e8f0; }
+.doctor-shared-data-block h4 { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; }
+.doctor-shared-record { display: grid; gap: 5px; padding: 12px; margin: 8px 0; border: 1px solid #e2e8f0; border-radius: 10px; background: #fbfdff; }
+.doctor-shared-record > span { color: #64748b; font-size: .88rem; }
+.doctor-shared-record p { margin: 4px 0 0; white-space: pre-wrap; }
+.doctor-shared-document { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.doctor-shared-document-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.doctor-shared-document-actions button { display: inline-flex; align-items: center; gap: 6px; }
+@media (max-width: 640px) {
+  .doctor-shared-document { grid-template-columns: 1fr; }
+}
+
+
+/* Batch 3: messaging, profile, consented insights and patient care updates */
+.clinical-messaging-layout{display:grid;grid-template-columns:270px minmax(0,1fr);gap:16px;margin-top:18px;min-height:500px}
+.clinical-contact-panel,.clinical-chat-panel,.doctor-settings-form{background:#fff;border:1px solid #e5edf2;border-radius:14px;padding:18px}
+.clinical-contact-panel h3{font-size:14px;margin-bottom:14px}
+.clinical-contact{display:flex;align-items:center;gap:10px;width:100%;padding:11px;border:0;border-radius:10px;background:transparent;text-align:left;cursor:pointer}
+.clinical-contact.active{background:#eaf8f5}
+.clinical-contact>span:last-child{display:grid;gap:4px;min-width:0}
+.clinical-contact strong{font-size:12px;color:#173247}
+.clinical-contact small{font-size:10px;color:#8394a7;overflow-wrap:anywhere}
+.clinical-avatar{width:38px;height:38px;flex:0 0 auto;border-radius:50%;display:grid;place-items:center;background:#e6f7f4;color:#087c73}
+.clinical-chat-panel{display:flex;flex-direction:column;min-width:0}
+.clinical-chat-panel>header{display:flex;align-items:center;gap:10px;padding-bottom:14px;border-bottom:1px solid #edf1f4}
+.clinical-chat-panel>header>div:last-child{display:grid;gap:4px}
+.clinical-chat-panel>header strong{font-size:13px}.clinical-chat-panel>header small{font-size:10px;color:#8394a7}
+.clinical-chat-history{display:flex;flex-direction:column;gap:12px;flex:1;min-height:320px;max-height:520px;overflow:auto;padding:16px 2px}
+.clinical-message{align-self:flex-start;max-width:78%;padding:11px 13px;background:#f1f5f9;border-radius:12px 12px 12px 3px}
+.clinical-message.mine{align-self:flex-end;background:#e7f7f3;border-radius:12px 12px 3px 12px}
+.clinical-message p{font-size:12px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;color:#173247}
+.clinical-message small{display:block;margin-top:6px;font-size:9px;color:#8394a7}
+.clinical-chat-empty{margin:auto;display:grid;justify-items:center;gap:8px;color:#8394a7;text-align:center;font-size:12px}
+.clinical-chat-empty strong{color:#173247}
+.clinical-chat-compose{display:flex;gap:9px;border-top:1px solid #edf1f4;padding-top:13px}
+.clinical-chat-compose input,.doctor-settings-form input,.doctor-settings-form textarea{width:100%;min-width:0;padding:11px 12px;border:1px solid #dfe8ec;border-radius:9px;font:inherit;font-size:12px;color:#173247;background:#fff}
+.clinical-chat-compose input{flex:1}
+.clinical-chat-compose button{display:flex;align-items:center;gap:7px;white-space:nowrap}
+.doctor-settings-form{display:grid;gap:17px}
+.doctor-settings-form h2{display:flex;align-items:center;gap:9px;font-size:15px;color:#173247}
+.doctor-settings-form h2 svg{color:#0d9488}
+.doctor-settings-form label{display:grid;gap:7px;font-size:11px;font-weight:700;color:#536b7d}
+.doctor-settings-form textarea{resize:vertical}
+.doctor-settings-grid,.doctor-availability-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+.doctor-settings-footer{display:flex;align-items:center;gap:13px;flex-wrap:wrap}
+.doctor-settings-footer span{font-size:11px;color:#087c65}
+.doctor-insight-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px;margin:18px 0}
+.doctor-insight-grid article{display:grid;gap:9px;padding:17px;background:#fff;border:1px solid #e5edf2;border-radius:12px}
+.doctor-insight-grid svg{color:#0d9488}.doctor-insight-grid span{font-size:11px;color:#8394a7}.doctor-insight-grid strong{font-size:24px;color:#173247}
+.doctor-insight-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid #edf1f4}
+.doctor-insight-row:last-child{border:0}.doctor-insight-row div{display:grid;gap:5px}.doctor-insight-row strong{font-size:12px}.doctor-insight-row small,.doctor-insight-row>span{font-size:10px;color:#8394a7}
+.patient-care-plan-card{padding:17px 0;border-bottom:1px solid #edf1f4}.patient-care-plan-card:last-child{border:0}
+.patient-care-plan-top,.patient-care-plan-meta{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.patient-care-plan-top small,.patient-care-plan-meta{font-size:10px;color:#8394a7}
+.patient-care-plan-card h3{font-size:14px;margin:12px 0 7px;color:#173247}
+.patient-care-plan-card>p{font-size:12px;line-height:1.7;color:#62788b;white-space:pre-wrap}
+.patient-care-plan-meta{justify-content:flex-start;margin-top:12px;gap:18px}.patient-care-plan-meta span{display:flex;align-items:center;gap:5px}
+@media(max-width:850px){.clinical-messaging-layout{grid-template-columns:1fr}.clinical-contact-panel{max-height:230px;overflow:auto}.doctor-insight-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.doctor-settings-grid,.doctor-availability-grid{grid-template-columns:1fr}.clinical-chat-compose{flex-direction:column}.clinical-chat-compose button{justify-content:center}.doctor-insight-grid{grid-template-columns:1fr 1fr}.doctor-insight-row{align-items:flex-start;flex-direction:column}}
