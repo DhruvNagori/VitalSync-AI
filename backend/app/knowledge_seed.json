@@ -1,0 +1,110 @@
+[
+  {
+    "document_slug": "nih-ods-iron",
+    "chunk_key": "food-and-supplement-safety",
+    "title": "Iron: food sources, absorption, and supplement safety",
+    "source_organization": "NIH Office of Dietary Supplements",
+    "source_url": "https://ods.od.nih.gov/factsheets/Iron-Consumer/",
+    "source_updated": "2023-08-17",
+    "reviewed_at": "2026-11-23",
+    "keywords": "iron deficiency low iron anemia ferritin hemoglobin food diet supplement vitamin c beans lentils spinach meat fatigue",
+    "content": "Iron is needed to make hemoglobin, which carries oxygen in red blood cells. Food sources include lean meat, seafood, poultry, iron-fortified cereals and breads, white beans, lentils, kidney beans, peas, spinach, nuts, and some dried fruit. Vitamin C-containing foods can improve absorption of iron from plant foods. Iron supplements are not appropriate for everyone and can interact with medicines. High supplemental doses can cause gastrointestinal effects, and very large doses can cause severe poisoning. People should discuss suspected deficiency and supplement use with a healthcare professional rather than selecting a high dose themselves.",
+    "active": true
+  },
+  {
+    "document_slug": "nhlbi-iron-deficiency-anemia",
+    "chunk_key": "assessment-and-causes",
+    "title": "Iron-deficiency anemia: assessment and causes",
+    "source_organization": "National Heart, Lung, and Blood Institute",
+    "source_url": "https://www.nhlbi.nih.gov/health/anemia/iron-deficiency-anemia",
+    "source_updated": "",
+    "reviewed_at": "2026-11-23",
+    "keywords": "iron deficiency anemia ferritin hemoglobin blood test blood loss absorption heavy periods bleeding fatigue shortness of breath",
+    "content": "Iron-deficiency anemia develops when the body does not have enough iron to make healthy red blood cells. Evaluation commonly includes medical history and blood tests, and a clinician may investigate blood loss, low dietary iron, increased needs, or reduced absorption. Symptoms can include tiredness, weakness, shortness of breath, dizziness, and pale skin, but symptoms alone cannot confirm the condition. Treatment depends on the cause and severity. Significant bleeding, chest pain, fainting, or severe difficulty breathing needs urgent in-person assessment.",
+    "active": true
+  },
+  {
+    "document_slug": "nhlbi-high-blood-pressure",
+    "chunk_key": "management-overview",
+    "title": "High blood pressure treatment and healthy habits",
+    "source_organization": "National Heart, Lung, and Blood Institute",
+    "source_url": "https://www.nhlbi.nih.gov/health/high-blood-pressure/treatment",
+    "source_updated": "",
+    "reviewed_at": "2026-11-23",
+    "keywords": "high blood pressure hypertension bp systolic diastolic DASH salt sodium exercise weight smoking sleep medicine",
+    "content": "High blood pressure should be confirmed and managed with a healthcare professional. A treatment plan may include heart-healthy lifestyle changes alone or together with prescribed medicines. Helpful habits can include following a DASH-style eating plan, reducing sodium, being physically active at an appropriate level, reaching a healthy weight, avoiding tobacco, limiting alcohol, managing stress, and getting adequate sleep. People taking blood-pressure medicine should not stop or change it without professional advice. Very high readings together with symptoms such as chest pain, severe shortness of breath, weakness, confusion, or vision changes require urgent medical assessment.",
+    "active": true
+  },
+  {
+    "document_slug": "niddk-diabetes-overview",
+    "chunk_key": "symptoms-and-management",
+    "title": "Diabetes overview, symptoms, and management",
+    "source_organization": "National Institute of Diabetes and Digestive and Kidney Diseases",
+    "source_url": "https://www.niddk.nih.gov/health-information/diabetes/overview",
+    "source_updated": "",
+    "reviewed_at": "2026-11-23",
+    "keywords": "diabetes type 1 type 2 gestational blood glucose blood sugar A1C thirsty urination fatigue blurred vision diet exercise",
+    "content": "Diabetes occurs when blood glucose is too high because the body does not make enough insulin, makes no insulin, or does not use insulin properly. Main types include type 1, type 2, and gestational diabetes. Possible symptoms include increased thirst and urination, fatigue, unexplained weight loss, blurred vision, slow-healing sores, and frequent infections; some people have no symptoms. Diagnosis requires appropriate testing. Management is individualized and can include monitoring, a suitable eating plan, physical activity, prescribed medicine, and attention to blood pressure and cholesterol. Medicine or insulin doses must be set with the healthcare team.",
+    "active": true
+  },
+  {
+    "document_slug": "nhlbi-asthma",
+    "chunk_key": "triggers-and-management",
+    "title": "Asthma causes, triggers, and everyday management",
+    "source_organization": "National Heart, Lung, and Blood Institute",
+    "source_url": "https://www.nhlbi.nih.gov/health/asthma/causes",
+    "source_updated": "2024-04-17",
+    "reviewed_at": "2026-11-23",
+    "keywords": "asthma wheeze wheezing cough shortness breath inhaler airway trigger pollen mold dust smoke cold air action plan",
+    "content": "Asthma involves inflammation and narrowing of the airways. Symptoms can include wheezing, coughing, chest tightness, and shortness of breath. Triggers differ between people and may include dust mites, mold, pet dander, pollen, smoke, air pollution, cold air, respiratory infections, stress, physical activity, and certain medicines. A healthcare professional can help confirm asthma, identify triggers, prescribe appropriate treatment, and create an asthma action plan. Sudden severe breathing difficulty, inability to speak normally, bluish lips, confusion, or failure of prescribed rescue treatment requires emergency care.",
+    "active": true
+  },
+  {
+    "document_slug": "cdc-stroke-signs",
+    "chunk_key": "emergency-signs",
+    "title": "Signs and symptoms of stroke",
+    "source_organization": "Centers for Disease Control and Prevention",
+    "source_url": "https://www.cdc.gov/stroke/signs-symptoms/",
+    "source_updated": "",
+    "reviewed_at": "2026-11-23",
+    "keywords": "stroke FAST face droop arm weakness speech slurred sudden numbness confusion vision dizziness balance severe headache emergency",
+    "content": "Stroke warning signs include sudden numbness or weakness of the face, arm, or leg, especially on one side; sudden confusion or difficulty speaking or understanding speech; sudden trouble seeing; sudden difficulty walking, dizziness, loss of balance, or poor coordination; and a sudden severe headache with no known cause. Every minute counts. If stroke is suspected, contact the local emergency service immediately, note when symptoms began, and use emergency transport rather than waiting for symptoms to improve. Brief symptoms may represent a transient ischemic attack and still need urgent medical attention.",
+    "active": true
+  },
+  {
+    "document_slug": "cdc-heart-attack",
+    "chunk_key": "emergency-signs",
+    "title": "Heart attack symptoms and emergency response",
+    "source_organization": "Centers for Disease Control and Prevention",
+    "source_url": "https://www.cdc.gov/heart-disease/about/heart-attack.html",
+    "source_updated": "2024-10-24",
+    "reviewed_at": "2026-11-23",
+    "keywords": "heart attack chest pain pressure squeezing shortness breath jaw neck back arm shoulder nausea faint cold sweat emergency",
+    "content": "A heart attack happens when part of the heart muscle does not receive enough blood. Warning signs can include chest discomfort or pressure that persists or returns, shortness of breath, weakness, light-headedness, fainting, a cold sweat, or pain in the jaw, neck, back, arms, or shoulders. Some people may have unusual tiredness, nausea, or vomiting. Symptoms can vary. If a heart attack is suspected, contact the local emergency service immediately; faster treatment can reduce heart-muscle damage.",
+    "active": true
+  },
+  {
+    "document_slug": "medlineplus-dehydration",
+    "chunk_key": "signs-and-response",
+    "title": "Dehydration symptoms and warning signs",
+    "source_organization": "MedlinePlus, U.S. National Library of Medicine",
+    "source_url": "https://medlineplus.gov/dehydration.html",
+    "source_updated": "",
+    "reviewed_at": "2026-11-23",
+    "keywords": "dehydration thirsty thirst dry mouth dark urine urination dizziness fluids vomiting diarrhea heat fainting confusion rapid heartbeat",
+    "content": "Dehydration results from losing more fluid than the body takes in. Adult symptoms can include thirst, dry mouth, less urination or sweating, dark urine, dry skin, tiredness, and dizziness. Infants and young children may have a dry mouth, few or no tears, fewer wet diapers, unusual sleepiness, irritability, or sunken eyes. Confusion, fainting, no urination, rapid heartbeat, rapid breathing, or signs of shock require immediate medical help. Ongoing vomiting or diarrhea, heat exposure, and certain illnesses can increase risk; the appropriate fluid plan depends on the person and severity.",
+    "active": true
+  },
+  {
+    "document_slug": "medlineplus-common-cold",
+    "chunk_key": "symptoms-and-self-care",
+    "title": "Common cold overview",
+    "source_organization": "MedlinePlus, U.S. National Library of Medicine",
+    "source_url": "https://medlineplus.gov/commoncold.html",
+    "source_updated": "",
+    "reviewed_at": "2026-11-23",
+    "keywords": "common cold viral infection runny nose stuffy nose sneezing sore throat cough fever antibiotics rest fluids",
+    "content": "The common cold is a usually mild viral infection of the upper respiratory tract. Symptoms may include a stuffy or runny nose, sneezing, sore throat, cough, headache, and mild body aches; fever is more common in children than adults. Antibiotics do not treat cold viruses. Rest, adequate fluids, and appropriate symptom relief may help, but over-the-counter products are not suitable for everyone or every age group. Seek medical advice for severe or worsening symptoms, breathing difficulty, dehydration, a persistent high fever, or concern about an infant or a person at higher risk of complications.",
+    "active": true
+  }
+]

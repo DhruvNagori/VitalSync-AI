@@ -1,448 +1,648 @@
 # VitalSync AI
 
-**An AI-enabled healthcare monitoring and patient-care web application**
+An academic healthcare-monitoring platform with patient and doctor portals, a
+PostgreSQL-backed account system, and a locally hosted fine-tuned Qwen3-4B health
+information chatbot.
 
-VitalSync AI is a web-based healthcare platform with separate patient and doctor portals. It brings together health information views, symptom tracking, medical-document management, appointment workflows, hospital discovery, and doctor–patient care interactions in one interface.
-
-> **Safety notice:** VitalSync AI is an academic/demo software project. It is not a certified medical device, does not provide a medical diagnosis, and must not be used for emergencies or as the sole basis for medical decisions. Use synthetic or de-identified data for development and demonstrations.
-
----
+> [!CAUTION]
+> VitalSync AI is an academic demonstration, not a medical device. It does not
+> diagnose, prescribe, or replace a qualified healthcare professional. Do not use
+> it for emergencies or with real identifiable patient data.
 
 ## Contents
 
-- [Overview](#overview)
+- [System overview](#system-overview)
+- [Architecture](#architecture)
 - [Features](#features)
 - [Technology stack](#technology-stack)
-- [Requirements](#requirements)
-- [Installation](#installation)
-- [Environment configuration](#environment-configuration)
-- [Run and build](#run-and-build)
+- [Quick start on an Apple Silicon Mac](#quick-start-on-an-apple-silicon-mac)
+- [Fine-tuned model and outputs](#fine-tuned-model-and-outputs)
+- [Datasets and data governance](#datasets-and-data-governance)
+- [Trusted-source RAG](#trusted-source-rag)
+- [Database and authentication](#database-and-authentication)
+- [API endpoints](#api-endpoints)
+- [Development commands](#development-commands)
 - [Repository structure](#repository-structure)
-- [Application workflows](#application-workflows)
-- [Data storage and privacy](#data-storage-and-privacy)
-- [GitHub contribution workflow](#github-contribution-workflow)
+- [Testing and verification](#testing-and-verification)
+- [Known limitations](#known-limitations)
+- [Privacy and security](#privacy-and-security)
+- [Contributing](#contributing)
 - [Troubleshooting](#troubleshooting)
-- [Disclaimer](#disclaimer)
 
-## Overview
+## System overview
 
-VitalSync AI provides two role-specific interfaces.
+```text
+Browser
+  │
+  ▼
+React frontend + Nginx (Docker, port 8080)
+  │ /api/v1
+  ▼
+FastAPI backend (Docker, port 8000)
+  ├── PostgreSQL (care data + reviewed RAG chunks + citations)
+  ├── strict local lexical retrieval
+  └── grounded prompt to Ollama via host.docker.internal:11434
+          │
+          ▼
+      Fine-tuned Qwen3-4B Q4_K_M GGUF
+```
 
-### Patient Portal
+Ollama runs natively on macOS so the model can use Apple Metal. The web
+application, API, and database run through Docker Compose.
 
-The patient-facing interface includes a health overview, symptom recording, health-history views, medical records, appointment requests, hospital discovery, messaging, and care-plan updates.
+## Architecture
 
-### Doctor Portal
+```mermaid
+flowchart LR
+    P[Patient portal] --> N[React + Nginx]
+    D[Doctor portal] --> N
+    N -->|REST /api/v1| API[FastAPI]
+    API --> AUTH[Authentication and role checks]
+    API --> CARE[Care workflow services]
+    API --> SAFE[Emergency phrase check]
+    SAFE --> RET[Lexical trusted-source retrieval]
+    RET -->|matched chunks| OLLAMA[Ollama + fine-tuned Qwen3-4B]
+    RET -->|no match| FALLBACK[Scope-limited response]
+    AUTH --> DB[(PostgreSQL)]
+    CARE --> DB
+    RET --> DB
+    OLLAMA --> API
+    API --> DB
+```
 
-The doctor-facing interface includes appointment request management, patient workspaces, consent-based health information, consultation notes, care plans, messaging, doctor profile settings, and patient insights.
+The two medical-data paths have different purposes:
 
-The current repository contains the React/Vite frontend. Some demonstration workflows use browser-side storage. A user interface should not be assumed to be connected to a production backend, database, or AI model unless that service is implemented and configured.
+1. **Fine-tuning path:** cleaned MedQuAD question-answer pairs teach the model
+   response style and general health-information patterns. The model weights do
+   not act as a reliable or up-to-date medical database.
+2. **RAG path:** a small, separately reviewed collection of government health
+   summaries is retrieved at request time. These chunks ground the answer and
+   produce visible, persistent citations.
+
+Emergency phrase detection runs before retrieval or generation. If retrieval
+finds no sufficiently relevant reviewed source, the backend does not call the
+model and returns a scope-limited response instead.
 
 ## Features
 
 ### Patient portal
 
-- Patient dashboard and health overview.
-- Health analytics and charts.
-- Symptom recording.
-- Health-history view.
-- Medical-record and document management.
-- AI assistant interface.
-- Appointment requests and doctor selection.
-- Consent selection for supported health information shared with the assigned doctor.
-- Individual selection of medical documents for sharing.
-- Hospital discovery and map interface using the Geoapify integration.
-- Connected-devices interface.
-- Patient profile.
-- Appointment-linked messaging.
-- Patient view of doctor-created care-plan and follow-up items.
+- Registration and login with persistent PostgreSQL storage.
+- Database-backed dashboard, symptom timeline, and medical-document management.
+- Simulated smart-band scenarios with persisted readings and explainable anomaly rules.
+- Location-filtered doctor discovery and appointment requests.
+- Per-appointment consent snapshots for profile, symptoms, history, wearable
+  readings, alerts, selected documents, written summaries, and chat summaries.
+- Persistent doctor messaging and care-plan updates.
+- Hospital discovery and clearly labelled simulated-device interfaces.
+- Local AI health-information assistant with conversation history.
+- Strict trusted-source RAG with persisted citations and an unsupported-topic fallback.
+- Deterministic emergency-message fallback and visible safety notices.
+- Clickable source links from the NIH, CDC, NIDDK, NHLBI, and MedlinePlus
+  knowledge collection.
 
 ### Doctor portal
 
-- Doctor dashboard.
-- Appointment request review and status management.
-- Patient directory.
-- Patient-care workspace.
-- Review of information shared through the appointment's consent selection.
-- Consultation notes and care-plan management.
-- Appointment-linked patient messaging.
-- Doctor profile and weekly availability settings.
-- Consent-based patient health insights.
+- Professional registration with specialization and registration number.
+- Doctor dashboard, appointment review, and patient directory.
+- Consent-scoped patient workspace.
+- Consultation notes, care plans, follow-up items, and messaging.
+- Doctor profile and availability settings.
 
-### Health information consent
+### Authentication and persistence
 
-The appointment workflow supports patient selection of available information categories, including:
-
-- Recorded symptoms.
-- The symptom-based health-history timeline.
-- Individually selected medical documents.
-- A patient-written health summary.
-
-The information shared with a doctor is limited to the information selected for that appointment request. Other information should remain outside that request's shared snapshot.
-
-Health metrics and wearable readings should only be presented as real patient data when their actual data sources are connected and implemented.
+- Patient and doctor accounts stored in PostgreSQL.
+- Argon2id password hashes; plaintext passwords are never stored.
+- Signed access tokens and session restoration after page refresh.
+- Unique email and professional registration-number constraints.
+- Authenticated chatbot endpoint.
+- Persistent Docker volume for accounts, health records, appointments, consent
+  snapshots, files, messages, notes, care plans, chatbot history, and mock wearable data.
 
 ## Technology stack
 
 | Area | Technology |
 |---|---|
-| Frontend framework | React 19 |
-| Development/build tool | Vite 8 |
-| Language | JavaScript and JSX |
+| Frontend | React 19, Vite 8, React Router |
 | Styling | Tailwind CSS 4 and project CSS |
-| Routing | React Router DOM 7 |
-| HTTP client | Axios |
-| Icons | Lucide React |
-| Charts | Recharts |
-| Maps | Leaflet and React Leaflet |
-| Hospital discovery | Geoapify integration |
-| Browser-side demo persistence | Local Storage and IndexedDB |
+| Backend | FastAPI, Pydantic, Uvicorn, HTTPX |
+| Database | PostgreSQL 17, SQLAlchemy, Psycopg |
+| Authentication | Argon2id password hashing, signed JWT access tokens |
+| Local inference | Ollama native on macOS |
+| Fine-tuned model | Qwen3-4B, QLoRA/PEFT adapter, Q4_K_M GGUF |
+| ML tooling | Unsloth, TRL, Transformers, Datasets, Google Colab |
+| Deployment | Docker Compose and Nginx |
+| Charts/maps | Recharts, Leaflet, React Leaflet |
 
-The versions above reflect the dependency declarations shown in `package.json`. `package-lock.json` is the dependency-resolution source of truth. Use the committed files rather than manually installing different versions.
+## Quick start on an Apple Silicon Mac
 
-## Requirements
+### 1. Requirements
 
-Install:
-
-1. **Node.js** — use an active LTS release compatible with the Vite version in `package.json`.
-2. **npm** — included with Node.js.
-3. **Git** — for cloning and contributing through GitHub.
-4. **Code editor** — Visual Studio Code is recommended.
-5. A Geoapify key only if required by the local hospital-discovery configuration.
-
-Verify the tools:
+Install Git, Docker Desktop, and Ollama for macOS. Node.js is only required when
+running the frontend outside Docker.
 
 ```bash
-node --version
-npm --version
 git --version
+docker --version
+docker compose version
+ollama --version
 ```
 
-## Installation
-
-### 1. Clone the repository
-
-Replace the placeholders with the actual GitHub account and repository name:
+### 2. Clone the repository
 
 ```bash
-git clone https://github.com/<github-username>/<repository-name>.git
-cd <repository-name>
+git clone https://github.com/sohitkumar7505/ai_based_health_monitoring_system.git
+cd ai_based_health_monitoring_system
 ```
 
-### 2. Install dependencies
+### 3. Configure local environment values
 
-Run this command in the project root, where `package.json` is located:
+```bash
+cp env.example .env
+openssl rand -hex 32
+```
+
+Put the generated value in `.env` as `JWT_SECRET`. Replace
+`POSTGRES_PASSWORD` with a separate strong local password before creating the
+database volume. Never commit `.env`.
+
+### 4. Reconstruct the fine-tuned adapter
+
+The trained adapter is split into three files so it can be stored in this public
+GitHub fork without Git LFS:
+
+```bash
+cat ml/artifacts/final_adapter/adapter_model.safetensors.part-* \
+  > ml/artifacts/final_adapter/adapter_model.safetensors
+
+shasum -a 256 ml/artifacts/final_adapter/adapter_model.safetensors
+```
+
+Expected SHA-256:
+
+```text
+9c72558f1888a244e4d536e36a98ebf2bd696eae9eeb133528283ac90dc4f777
+```
+
+### 5. Create the GGUF model
+
+The 2.3 GiB GGUF cannot be committed because it exceeds GitHub Free/Pro's 2 GB
+per-file Git LFS limit. Generate it in Colab from the included adapter:
+
+```python
+model.save_pretrained_gguf(
+    "medquad-qwen3-4b",
+    tokenizer,
+    quantization_method="q4_k_m",
+)
+```
+
+The full workflow is in
+[`ml/notebooks/medquad_qwen3_4b_qlora_colab.ipynb`](ml/notebooks/medquad_qwen3_4b_qlora_colab.ipynb).
+Copy or download the export to:
+
+```text
+ml/gguf/Qwen3-4B.Q4_K_M.gguf
+```
+
+Expected GGUF SHA-256 for the current export:
+
+```text
+ff0ce1032104a78625448e2b72d6632f1d16b9a93152c5dada737cd54f874e2d
+```
+
+### 6. Import and test the model with Ollama
+
+Start the Ollama macOS application, then run:
+
+```bash
+ollama create vitalsync-medquad-qwen3-4b -f ml/gguf/Modelfile
+ollama list
+ollama run vitalsync-medquad-qwen3-4b "What is hypertension?"
+curl http://localhost:11434/api/version
+```
+
+### 7. Start the application
+
+Start Docker Desktop, then run:
+
+```bash
+docker compose up -d --build
+```
+
+Open:
+
+- Application: <http://localhost:8080>
+- API documentation: <http://localhost:8000/docs>
+- Backend health: <http://localhost:8000/api/v1/health>
+
+Register a patient or doctor account, log in, and open the patient AI Assistant.
+
+## Fine-tuned model and outputs
+
+### Model configuration
+
+| Property | Value |
+|---|---|
+| Base model | `unsloth/Qwen3-4B-unsloth-bnb-4bit` |
+| Fine-tuning method | Supervised QLoRA/PEFT |
+| LoRA rank / alpha | 16 / 32 |
+| LoRA dropout | 0 |
+| Maximum sequence length | 2,048 |
+| Learning rate | `1e-4` |
+| Micro batch / gradient accumulation | 1 / 8 |
+| Deployment quantization | `Q4_K_M` |
+
+### Dataset
+
+| Stage | Records |
+|---|---:|
+| Raw MedQuAD records | 47,441 |
+| After cleaning and normalized deduplication | 15,133 |
+| Safe/unflagged records | 12,194 |
+| Manual-review records | 2,939 |
+| Train split | 9,722 |
+| Validation split | 1,203 |
+| Test split | 1,269 |
+
+The split is grouped by medical `Focus`, with zero Focus overlap among training,
+validation, and test data. Treatment, prevention, diagnosis, medication, vaccine,
+and year-sensitive records are retained in `ml/dataset/review_required.jsonl`.
+
+## Datasets and data governance
+
+### MedQuAD fine-tuning dataset
+
+The supervised fine-tuning data is derived from **MedQuAD**, a collection of
+medical question-answer pairs assembled from public NIH and other U.S.
+government health-information websites. The repository stores the processed
+JSONL outputs and source metadata, not a claim that every original answer is
+clinically current.
+
+The cleaning pipeline in `ml/scripts/prepare_medquad.py` applies these rules:
+
+1. Remove empty answers.
+2. Remove answers identical to their question.
+3. Remove short question-like answers ending in `?`.
+4. Remove “These resources address...” placeholders.
+5. Remove link-dependent answers whose content is unavailable locally.
+6. Deduplicate normalized question-answer pairs.
+7. Route treatment, prevention, and diagnosis records to manual review.
+8. Route records containing years, medications, or vaccines to manual review.
+9. Group-split by medical `Focus` to prevent topic leakage.
+10. Preserve source URL, source collection, Focus, and question type as metadata.
+
+| Processed file | Records | Use |
+|---|---:|---|
+| `ml/dataset/train.jsonl` | 9,722 | Approved QLoRA training split |
+| `ml/dataset/valid.jsonl` | 1,203 | Validation during training |
+| `ml/dataset/test.jsonl` | 1,269 | Untouched grouped evaluation split |
+| `ml/dataset/review_required.jsonl` | 2,939 | Higher-risk records excluded pending review |
+| `ml/dataset/summary.json` | — | Cleaning counts, source counts, and leakage check |
+
+The 12,194 safe records originate from these MedQuAD source collections:
+
+| Source collection | Safe records |
+|---|---:|
+| GARD | 4,300 |
+| Genetics Home Reference (GHR) | 4,209 |
+| MedlinePlus Health Topics | 866 |
+| NINDS | 774 |
+| NIDDK | 704 |
+| Cancer.gov | 486 |
+| NIH Senior Health | 460 |
+| NHLBI | 296 |
+| CDC | 99 |
+
+The processed data is appropriate for a reproducible academic experiment, but
+dataset size alone does not establish correctness. The flagged queue still needs
+qualified manual review, and the untouched test split should remain excluded
+from training and prompt development.
+
+### Runtime RAG knowledge dataset
+
+The runtime knowledge base is independent of the MedQuAD training splits. It is
+stored in `backend/app/knowledge_seed.json` and currently contains nine locally
+written, reviewed summaries covering eight topic areas. Each record includes a
+canonical government URL, organization, stable identifier, review date, and
+retrieval keywords. The source pages come from NIH Office of Dietary
+Supplements, NHLBI, NIDDK, CDC, and NLM MedlinePlus.
+
+The application never inserts patient records, chatbot history, uploaded
+documents, or wearable readings into the shared medical knowledge collection.
+See [`docs/RAG.md`](docs/RAG.md) for the complete source inventory and review
+procedure.
+
+### Current saved run
+
+The committed adapter is a smoke-test result:
+
+- 1,000 training and 200 validation examples
+- 100 optimizer steps, reaching 0.8 epoch
+- Validation loss at step 50: `1.0856`
+- Validation loss at step 100: `1.0501`
+
+These metrics show that optimization ran successfully. They do not demonstrate
+medical correctness or clinical safety.
+
+### Reproducibility files
+
+| Location | Contents |
+|---|---|
+| [`MODEL_CARD.md`](MODEL_CARD.md) | Intended use, limitations, evaluation requirements |
+| [`ml/README.md`](ml/README.md) | ML-package instructions |
+| `ml/artifacts/final_adapter/` | Split trained adapter and tokenizer |
+| `ml/dataset/` | Cleaned dataset splits and review queue |
+| `ml/notebooks/` | Training and base-versus-fine-tuned comparison |
+| `ml/results/` | Trainer state and compact result summary |
+| [`ml/results/base_vs_finetuned/REVIEW.md`](ml/results/base_vs_finetuned/REVIEW.md) | Base-vs-fine-tuned metrics and factual-error audit |
+| `ml/scripts/prepare_medquad.py` | Dataset cleaning and splitting pipeline |
+| `ml/gguf/` | Ollama Modelfile and GGUF documentation |
+
+## Trusted-source RAG
+
+The chatbot retrieves reviewed evidence from PostgreSQL before calling the local
+fine-tuned model. The initial collection covers eight common topics using nine
+NIH, CDC, NIDDK, NHLBI, and MedlinePlus pages. Responses display source links and
+persist citations with chat history. If no reviewed evidence matches, the API
+returns a scope-limited response without asking the model to guess.
+
+At backend startup, the JSON knowledge collection is idempotently seeded into
+PostgreSQL. Retrieval uses a dependency-free TF/IDF-like lexical score with
+keyword and title boosts, an absolute relevance floor, and a relative cutoff to
+discard weak secondary matches. Retrieved chunks are labelled `[S1]`, `[S2]`,
+and so on. The backend validates those labels and uses a deterministic cited
+summary if the generated response does not cite its evidence correctly.
+
+See [`docs/RAG.md`](docs/RAG.md) for the architecture, complete source inventory,
+strict-grounding behavior, and the process for adding reviewed sources.
+
+## Database and authentication
+
+PostgreSQL runs as the internal `database` service. Account data persists in the
+named volume `vitalsync-ai_postgres_data`.
+
+```bash
+# Inspect accounts without showing password hashes
+docker compose exec database psql -U vitalsync -d vitalsync \
+  -c "SELECT id, name, email, role, is_verified, created_at FROM users;"
+
+# Stop containers and preserve accounts
+docker compose down
+
+# Permanently delete the local database volume and accounts
+docker compose down --volumes
+```
+
+Do not use `--volumes` unless deletion is intentional.
+
+## API endpoints
+
+| Method | Endpoint | Authentication | Purpose |
+|---|---|---:|---|
+| `GET` | `/api/v1/health` | No | Backend/model configuration health |
+| `POST` | `/api/v1/auth/register` | No | Register patient or doctor |
+| `POST` | `/api/v1/auth/login` | No | Verify credentials and issue token |
+| `GET` | `/api/v1/auth/me` | Bearer | Restore current account |
+| `POST` | `/api/v1/chat` | Bearer | Send chatbot request |
+| `GET` | `/api/v1/chat/history` | Bearer | Load persisted chatbot history |
+| `GET` | `/api/v1/knowledge/sources` | Bearer | List active trusted RAG sources |
+| `GET/POST` | `/api/v1/symptoms` | Patient | List or create symptom records |
+| `GET` | `/api/v1/wearables` | Patient | Read demo-band state, readings, and alerts |
+| `POST` | `/api/v1/wearables/device` | Patient | Configure the simulated band |
+| `POST` | `/api/v1/wearables/sync` | Patient | Generate and persist mock readings |
+| `GET/POST` | `/api/v1/appointments` | Bearer | List or create appointment requests |
+| `PATCH` | `/api/v1/appointments/{id}/status` | Bearer | Review or cancel an appointment |
+| `GET` | `/api/v1/doctors` | Bearer | Discover registered doctors by city |
+| `GET/POST` | `/api/v1/documents` | Patient | List or upload medical documents |
+| `GET` | `/api/v1/doctor/patients/{id}` | Doctor | Open the consent-scoped workspace |
+| `GET/POST` | `/api/v1/messages` | Bearer | Appointment-linked messaging |
+
+Example chat body:
+
+```json
+{
+  "message": "What is hypertension?",
+  "history": [
+    {"role": "user", "content": "What is blood pressure?"},
+    {"role": "assistant", "content": "Blood pressure is..."}
+  ]
+}
+```
+
+## Development commands
+
+### Docker workflow
+
+```bash
+docker compose up -d --build
+docker compose ps
+docker compose logs -f backend
+docker compose down
+```
+
+### Frontend outside Docker
 
 ```bash
 npm install
-```
-
-This installs the packages declared by the project and resolves them using `package-lock.json`.
-
-The current frontend dependency declarations include:
-
-- `react`
-- `react-dom`
-- `react-router-dom`
-- `axios`
-- `lucide-react`
-- `recharts`
-- `leaflet`
-- `react-leaflet`
-- `tailwindcss`
-- `@tailwindcss/vite`
-
-Development dependencies include Vite, the React Vite plugin, ESLint, and React type packages. `npm install` installs the declared dependencies; installing them individually is not necessary.
-
-When adding or updating a dependency, use npm and commit both `package.json` and `package-lock.json`.
-
-## Environment configuration
-
-The repository includes a safe `.env.example` template. Environment files containing local values or credentials must not be committed.
-
-### Create a local environment file
-
-After cloning, create `.env.local` in the project root by copying `.env.example`.
-
-macOS/Linux:
-
-```bash
-cp .env.example .env.local
-```
-
-Windows PowerShell:
-
-```powershell
-Copy-Item .env.example .env.local
-```
-
-The local API base URL template is:
-
-```env
-VITE_API_BASE_URL=http://localhost:8000/api/v1
-```
-
-This points the frontend to a FastAPI backend running locally on port `8000`. The backend must be started separately for API calls to succeed. If the backend uses a different host, port, or API prefix, update this value in the local `.env.local` file.
-
-### Geoapify configuration
-
-The local `.env` file may contain a Geoapify API key used by the hospital-discovery service. Do not commit that file.
-
-Before adding a Geoapify placeholder to `.env.example`, check `src/services/hospitalService.js` for the exact environment variable name used by the code. Add that variable name with a placeholder only; never copy the real key.
-
-**Frontend key warning:** Vite variables prefixed with `VITE_` are included in the browser bundle and can be inspected by users. A Geoapify key used in frontend code is not a private secret. Restrict it through provider settings (for example, allowed domains/referrers and usage limits) where supported. Database passwords, private API keys, JWT signing secrets, OAuth client secrets, and other privileged credentials must stay on the backend.
-
-### Environment files: what to commit
-
-| File | Commit to GitHub? | Purpose |
-|---|---:|---|
-| `.env` | No | Local values; may contain the Geoapify key |
-| `.env.local` | No | Machine-specific backend URL and local overrides |
-| `.env.example` | Yes | Safe template with placeholder values only |
-
-The file must be named exactly `.env.example` (without a trailing colon). Do not rename it to `.env`; the example file is intended to be safe to publish.
-
-## Run and build
-
-### Start the frontend development server
-
-```bash
+cp env.example .env.local
 npm run dev
 ```
 
-Open the URL printed by Vite in the terminal. The default is commonly:
+The Vite development server normally runs at <http://localhost:5173>. The Docker
+backend and database must still be available.
 
-```text
-http://localhost:5173
-```
-
-Stop the server with `Ctrl + C`.
-
-### Run linting
+### Quality checks
 
 ```bash
 npm run lint
-```
-
-### Create a production build
-
-```bash
 npm run build
+PYTHONPYCACHEPREFIX=/tmp/vitalsync-pycache python3 -m compileall -q backend/app
+docker compose config
 ```
-
-### Preview the production build
-
-```bash
-npm run preview
-```
-
-These commands are defined in `package.json`.
-
-### Backend URL note
-
-The frontend environment template points to `http://localhost:8000/api/v1`. This is only a URL configuration; it does not install or start FastAPI. If no backend is running at that address, API requests that depend on it will fail. Start the backend separately when its source and setup instructions are available.
 
 ## Repository structure
 
 ```text
-healthcare-website/
-├── public/                         # Public static assets
-├── src/
-│   ├── assets/                     # Application assets
-│   ├── components/
-│   │   ├── appointments/           # Calendar and time-slot components
-│   │   ├── common/                 # Shared UI and protected-route components
-│   │   ├── doctor/                 # Doctor sidebar and topbar
-│   │   ├── hospitals/              # Hospital cards
-│   │   └── patient/                # Patient dashboard, health and navigation UI
-│   ├── context/
-│   │   └── AuthContext.jsx         # Authentication/application user context
-│   ├── data/
-│   │   └── patientDashboardData.js # Patient dashboard data
-│   ├── layouts/
-│   │   ├── AuthLayout.jsx
-│   │   ├── DoctorLayout.jsx
-│   │   └── PatientLayout.jsx
-│   ├── pages/
-│   │   ├── auth/                   # Login and registration pages
-│   │   ├── doctor/                 # Doctor dashboard and care pages
-│   │   ├── patient/                # Patient health and care pages
-│   │   └── LandingPage.jsx
-│   ├── services/
-│   │   ├── api.js                  # API helper
-│   │   ├── doctorService.js        # Doctor and appointment demo services
-│   │   └── hospitalService.js      # Hospital discovery/location service
-│   ├── styles/                     # Doctor, patient and global styles
-│   ├── utils/
-│   │   ├── healthHistoryStorage.js
-│   │   └── medicalRecordsStorage.js
-│   ├── App.jsx                     # Application routes
-│   ├── index.css                   # Stylesheet entry point
-│   └── main.jsx                    # React application entry point
-├── .env                            # Local environment values; do not commit
-├── .env.local                      # Local overrides; do not commit
-├── .env.example                    # Safe configuration template
-├── .gitignore                      # Git exclusion rules
-├── index.html                      # Vite HTML entry point
-├── package.json                    # Dependencies and npm scripts
-├── package-lock.json               # Locked dependency versions
-├── vite.config.js                  # Vite configuration
-└── README.md                       # Project documentation
+ai_based_health_monitoring_system/
+├── backend/
+│   ├── app/
+│   │   ├── auth_routes.py         # Registration and login API
+│   │   ├── database.py            # SQLAlchemy sessions
+│   │   ├── domain_routes.py       # Care, wearable, document, and messaging APIs
+│   │   ├── main.py                # Chat API and safety/grounding
+│   │   ├── models.py              # PostgreSQL healthcare domain models
+│   │   ├── rag.py                 # Local trusted-source retrieval
+│   │   ├── knowledge_seed.json     # Reviewed runtime RAG summaries
+│   │   ├── schemas.py             # API schemas
+│   │   └── security.py            # Argon2id and tokens
+│   ├── Dockerfile
+│   └── requirements.txt
+├── ml/
+│   ├── artifacts/final_adapter/   # Split adapter and tokenizer
+│   ├── dataset/                   # Cleaned JSONL splits
+│   ├── gguf/                      # Ollama import files
+│   ├── notebooks/                 # Colab training and comparison
+│   ├── results/                   # Training outputs
+│   └── scripts/                   # Dataset preparation
+├── model/                         # Application Modelfile example
+├── docs/RAG.md                    # RAG architecture and source inventory
+├── public/
+├── src/                           # React application
+├── compose.yaml
+├── Dockerfile                     # React/Nginx image
+├── nginx.conf
+├── env.example
+├── MODEL_CARD.md
+└── README.md
 ```
 
-`node_modules/` and `dist/` may appear locally after installation or build. They are generated directories and should not be committed.
+Generated dependencies, builds, `.env` files, database contents, reconstructed
+model weights, and GGUF files are ignored by Git.
 
-## Key application workflows
+## Testing and verification
 
-### Patient appointment and consent
+The implementation has been checked with:
 
-1. The patient opens the appointment page.
-2. The patient selects an available facility, doctor, date, and time.
-3. The patient chooses which supported health-information categories to share.
-4. The patient can select individual medical documents and optionally provide a written summary.
-5. The appointment request stores the selected consent information.
-6. The assigned doctor reviews the request and the information included in that request's consent snapshot.
+- React production build and lint command.
+- Backend Python compilation and Docker Compose validation.
+- PostgreSQL health and persistence across backend restart.
+- Patient/doctor registration, duplicate rejection, and Argon2id hashing.
+- Login, token restoration, and role-based routing.
+- Authenticated end-to-end Ollama inference.
+- Patient-to-doctor workflow: symptoms, simulated wearable sync, alerts,
+  consent snapshot, review, note, care plan, and message.
+- Emergency fallback and disclaimer-only response retry.
+- Supported-topic RAG answers, unsupported-topic fallback, citation validation,
+  and citation restoration from chat history.
+- Retrieval checks for iron deficiency, hypertension, diabetes, asthma, stroke,
+  heart attack, dehydration, and the common cold.
+- Adapter reconstruction and SHA-256 verification.
 
-### Doctor patient care
+Synthetic accounts created during testing were removed.
 
-1. The doctor reviews appointment requests assigned to their account.
-2. The doctor opens the patient workspace from an assigned request.
-3. The doctor reviews the information shared for that appointment.
-4. The doctor can add consultation notes and care-plan items.
-5. The patient can view doctor-created care-plan and follow-up information in the patient portal.
+## Known limitations
 
-### Messaging
+- The committed adapter is a smoke-run model trained on 1,000 examples.
+- A 4B model can produce confident but incorrect health information.
+- The reviewed RAG collection contains only nine source chunks across eight
+  topic areas; questions outside that scope receive a limited response.
+- Retrieval is lexical rather than embedding-based and may miss unfamiliar
+  synonyms or differently phrased questions.
+- Knowledge summaries are reviewed local snapshots and do not refresh
+  automatically when a source page changes.
+- A valid citation label does not prove that every generated sentence is fully
+  entailed by its source.
+- Training loss does not establish medical accuracy.
+- Doctor verification has no administrative workflow yet.
+- Smart-band readings and alerts are simulated; there is no Bluetooth or
+  certified medical-device integration.
+- Anomaly detection uses simple transparent thresholds and is not diagnostic.
+- Token storage and automatic table creation are for local academic use, not a
+  production healthcare deployment.
 
-The messaging interface supports conversations between patients and doctors connected through appointment requests. In the current browser-based demonstration, messages use browser-side storage. This is not a production real-time messaging service and must not be used for emergency communication.
+Before reporting final results, train on the full approved set and compare the
+base and fine-tuned models on the untouched Focus-grouped test set. Report factual
+correctness, unsupported claims, safety violations, emergency behavior, latency,
+and memory use.
 
-## Data storage and privacy
+## Privacy and security
 
-Healthcare-related information is sensitive. Never push any of the following to a public or shared Git repository:
+Never commit or enter:
 
-- `.env`, `.env.local`, or other environment files containing real values.
-- API keys, access tokens, refresh tokens, passwords, or private keys.
-- Database URLs, usernames/passwords, or production connection strings.
-- JWT signing secrets, encryption keys, OAuth client secrets, or service-account files.
-- Real patient names, phone numbers, email addresses, medical histories, prescriptions, scans, reports, or other identifiable health information.
-- Real medical documents uploaded through the application.
-- Database dumps, production exports, or backups containing personal data.
-- Browser storage exports or IndexedDB data.
-- Logs containing credentials, authorization headers, personal information, or health information.
-- Private certificates and credential files.
+- Real patient identifiers, contact information, or medical records.
+- Production database credentials, JWT secrets, API keys, or private keys.
+- `.env`, `.env.local`, database dumps, uploaded documents, or browser exports.
+- Logs containing authorization headers or health information.
 
-### Browser storage limitations
+For a real deployment, add HTTPS, secure HTTP-only cookies, database migrations,
+encrypted storage, managed secrets, backups, audit logs, authorization tests,
+retention controls, and review against applicable health-data requirements.
 
-Some demonstration workflows use Local Storage and IndexedDB:
-
-- Data is stored in the browser, not automatically in a shared server database.
-- Data may not appear on another device, browser profile, or deployment.
-- Browser storage is not a secure authorization boundary.
-- A person with access to the browser profile may inspect or modify local data.
-- Local demo messaging is not a production real-time service.
-
-Use synthetic data only. A production healthcare system requires server-side authentication and authorization, secure document storage, encrypted transport, audit logging, robust consent enforcement, backups, and review of applicable privacy and healthcare regulations.
-
-### If a secret is accidentally committed
-
-1. Revoke or rotate the exposed credential immediately.
-2. Review provider access logs for suspicious activity.
-3. Remove the secret from the repository and Git history using an appropriate history-rewrite process.
-4. Coordinate history rewriting with everyone who has cloned the repository.
-5. Do not assume deleting the latest file makes the credential safe; old commits and clones may still contain it.
-
-## GitHub contribution workflow
-
-### Clone and install
-
-```bash
-git clone https://github.com/<github-username>/<repository-name>.git
-cd <repository-name>
-npm install
-```
-
-Create `.env.local` from `.env.example`, configure local values, then run `npm run dev`.
-
-### Create a feature branch
+## Contributing
 
 ```bash
-git pull origin main
+git clone https://github.com/sohitkumar7505/ai_based_health_monitoring_system.git
+cd ai_based_health_monitoring_system
 git switch -c feature/short-description
 ```
 
-Examples:
-
-```text
-feature/patient-profile
-fix/appointment-validation
-docs/setup-instructions
-```
-
-### Review, commit, and push
+Before committing:
 
 ```bash
+npm run lint
+npm run build
 git status
 git diff
 ```
 
-Stage only the intended files:
+Then:
 
 ```bash
-git add <file-or-directory>
-```
-
-Commit and push:
-
-```bash
+git add <intended-files>
 git commit -m "Describe the change"
 git push -u origin feature/short-description
 ```
 
-Open a Pull Request and explain what changed, why it changed, how it was tested, and whether configuration or migration steps are needed.
-
-### Repository hygiene
-
-- Use feature branches and Pull Requests.
-- Pull the latest default branch before starting work.
-- Avoid force-pushing shared branches.
-- Do not commit `node_modules/`, `dist/`, credentials, logs, local databases, or real health data.
-- Commit `package-lock.json` when dependencies change.
-- Run `npm run lint` and `npm run build` before submitting a Pull Request.
-- Do not include credentials or real health information in screenshots, test fixtures, issues, or Pull Request descriptions.
+Do not commit `node_modules`, `dist`, `.env`, real health data, the reconstructed
+`.safetensors` file, or GGUF files.
 
 ## Troubleshooting
 
-### `npm: command not found`
-
-Install Node.js, reopen the terminal, and verify:
+### Local model unavailable
 
 ```bash
-node --version
-npm --version
+curl http://localhost:11434/api/version
+ollama list
+docker compose logs --tail=100 backend
 ```
 
-### Dependencies are missing
+The model name must be `vitalsync-medquad-qwen3-4b` unless `OLLAMA_MODEL` is
+changed in `.env`.
 
-Run this in the directory containing `package.json`:
+### Adapter cannot be loaded
+
+Reconstruct it and compare the SHA-256 value with the checksum above:
 
 ```bash
-npm install
+cat ml/artifacts/final_adapter/adapter_model.safetensors.part-* \
+  > ml/artifacts/final_adapter/adapter_model.safetensors
 ```
 
-### Vite cannot resolve an import
+### PostgreSQL connection problem
 
-Check that the file exists, the import path and filename capitalization match, the package is declared in `package.json`, and dependency installation completed.
+```bash
+docker compose ps
+docker compose logs database
+docker compose logs backend
+```
 
-### The browser displays a blank page
+If the volume was created with different credentials, update the PostgreSQL role
+consistently or intentionally recreate an empty development volume.
 
-1. Open browser developer tools and inspect the Console.
-2. Check the terminal running Vite for build/transform errors.
-3. Fix the first reported error before investigating later errors.
-4. Restart the development server if necessary.
+### Frontend shows old code
 
-### Environment changes are not reflected
+```bash
+docker compose up -d --build frontend
+```
 
-Restart Vite after changing environment files. Confirm that the variable name matches the one referenced in source code.
+Then hard-refresh with `Cmd + Shift + R`.
+
+### Default ports
+
+- `8080`: React/Nginx application
+- `8000`: FastAPI
+- `11434`: native Ollama
+
+## License and attribution
+
+Review and preserve the licenses and terms of the base model, source datasets,
+and third-party libraries before redistribution or deployment. The cleaned
+dataset retains source metadata and URLs for academic traceability.
 
 ## Disclaimer
 
-VitalSync AI is an educational software project. It is not intended to diagnose, treat, cure, or prevent any disease, and it does not replace consultation with qualified healthcare professionals. Do not use it for emergencies or as the sole basis for medical decisions. Use synthetic or de-identified data for development and demonstrations.
+VitalSync AI is educational software. It is not intended to diagnose, treat,
+cure, or prevent disease and must not be used as the sole basis for medical
+decisions. For urgent symptoms, contact local emergency services or seek
+immediate in-person medical care.

@@ -1,120 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  Users, CalendarDays, Clock3, CheckCircle2, ArrowRight,
-  ClipboardList, Activity, Stethoscope, RefreshCw
-} from "lucide-react";
-import { useAuth } from "../../context/AuthContext";
-import {
-  getAppointmentRequests, getPatientDirectory, subscribeToDemoData,
-  formatAppointmentDate
-} from "../../services/doctorService";
+import { Activity, ArrowRight, CalendarDays, CheckCircle2, Clock3, RefreshCw, Users } from "lucide-react";
+import { getDoctorDashboard } from "../../services/careService";
 import "../../styles/doctor.css";
 
-function Metric({ icon: Icon, label, value, detail }) {
-  return (
-    <article className="feature-metric-card doctor-metric-card">
-      <div className="feature-metric-top">
-        <div className="feature-metric-icon"><Icon size={21} /></div>
-        <span className="feature-status">DEMO DATA</span>
-      </div>
-      <p>{label}</p><div className="feature-metric-value"><strong>{value}</strong></div><small>{detail}</small>
-    </article>
-  );
-}
-
-export default function DoctorDashboard() {
-  const navigate = useNavigate();
-  const { currentUser } = useAuth();
-  const doctorId = String(currentUser?.id ?? currentUser?.email ?? "");
-  const [requests, setRequests] = useState([]);
-  const [patients, setPatients] = useState([]);
-
-  function refresh() {
-    const assigned = getAppointmentRequests().filter(
-      (item) => String(item.assignedDoctorId ?? "") === doctorId
-    );
-    setRequests(assigned);
-    setPatients(getPatientDirectory(doctorId));
-  }
-
-  useEffect(() => {
-    refresh();
-    return subscribeToDemoData(refresh);
-  }, [doctorId]);
-
-  const pending = useMemo(
-    () => requests.filter((item) => (item.status || "Pending review") === "Pending review").length,
-    [requests]
-  );
-  const accepted = useMemo(() => requests.filter((item) => item.status === "Accepted").length, [requests]);
-
-  return (
-    <div className="patient-feature-page doctor-feature-page">
-      <div className="feature-page-header doctor-welcome-header">
-        <div><span className="feature-eyebrow">VITALSYNC AI · DOCTOR PORTAL</span>
-          <h1>Welcome, Dr. {currentUser?.name || "Doctor"}</h1>
-          <p>Review incoming patient requests and manage your clinical workspace.</p>
-        </div>
-        <button className="feature-secondary-button" onClick={refresh}><RefreshCw size={16} /> Refresh data</button>
-      </div>
-      <div className="doctor-demo-banner"><Activity size={18} />
-        <p><strong>Demonstration workspace:</strong> figures and requests are browser-local sample data, not a live hospital system or verified medical record.</p>
-      </div>
-      <section className="feature-section">
-        <div className="feature-section-heading"><div><h2>Workspace overview</h2><p>Current information assigned to your doctor account.</p></div></div>
-        <div className="feature-metric-grid">
-          <Metric icon={Users} label="Patients in directory" value={patients.length} detail="Unique linked patient profiles" />
-          <Metric icon={CalendarDays} label="Incoming requests" value={requests.length} detail="Requests assigned to you" />
-          <Metric icon={Clock3} label="Awaiting review" value={pending} detail="Requests not yet reviewed" />
-          <Metric icon={CheckCircle2} label="Accepted requests" value={accepted} detail="Marked accepted in this demo" />
-        </div>
-      </section>
-      <section className="feature-section">
-        <div className="feature-section-heading">
-          <div><h2>Appointment request activity</h2><p>Latest requests assigned to your account.</p></div>
-          <button className="feature-text-button" onClick={() => navigate("/doctor/appointments")}>View all <ArrowRight size={15} /></button>
-        </div>
-        <div className="feature-panel">
-          {requests.length === 0 ? (
-            <div className="feature-empty-state">
-              <div className="feature-empty-icon"><CalendarDays size={25} /></div>
-              <h3>No requests available yet</h3>
-              <p>Requests assigned to your doctor account from the patient portal will appear here.</p>
-              <button className="feature-secondary-button" onClick={() => navigate("/doctor/appointments")}>Open request queue <ArrowRight size={15} /></button>
-            </div>
-          ) : (
-            <div className="feature-record-list">{requests.slice(0, 5).map((item) => (
-              <div className="feature-record-item" key={item.id}>
-                <div className="doctor-request-summary"><div className="doctor-request-icon"><CalendarDays size={20} /></div>
-                  <div><h4>{item.facilityName || "Healthcare facility request"}</h4>
-                    <p>{item.patient?.name || "Patient details not supplied"} · {formatAppointmentDate(item.date)} · {item.time || "Time not selected"}</p>
-                    <p>{item.city || item.address || "Location not provided"}</p>
-                  </div>
-                </div>
-                <span className={`doctor-status-pill ${item.status === "Accepted" ? "is-accepted" : item.status === "Declined" ? "is-declined" : ""}`}>{item.status || "Pending review"}</span>
-              </div>
-            ))}</div>
-          )}
-        </div>
-      </section>
-      <section className="feature-section">
-        <div className="feature-section-heading"><div><h2>Quick access</h2><p>Move directly to common doctor workflows.</p></div></div>
-        <div className="feature-shortcut-grid">
-          <button className="feature-shortcut-card" onClick={() => navigate("/doctor/patients")}>
-            <div className="feature-shortcut-icon"><Users size={22} /></div><h3>Patient Directory</h3>
-            <p>Search patient information linked to your account.</p><span>Open directory <ArrowRight size={15} /></span>
-          </button>
-          <button className="feature-shortcut-card" onClick={() => navigate("/doctor/appointments")}>
-            <div className="feature-shortcut-icon"><ClipboardList size={22} /></div><h3>Review Requests</h3>
-            <p>Review, accept or decline incoming demonstration requests.</p><span>Open requests <ArrowRight size={15} /></span>
-          </button>
-          <div className="feature-shortcut-card doctor-static-card">
-            <div className="feature-shortcut-icon"><Stethoscope size={22} /></div><h3>Clinical workspace</h3>
-            <p>Manage consultation notes and care-plan items for linked patients.</p><span>Available in Patient Care</span>
-          </div>
-        </div>
-      </section>
-    </div>
-  );
-}
+function Metric({icon:Icon,label,value,detail}){return <article className="feature-metric-card"><div className="feature-metric-top"><div className="feature-metric-icon"><Icon size={21}/></div><span className="feature-status">DATABASE</span></div><p>{label}</p><div className="feature-metric-value"><strong>{value}</strong></div><small>{detail}</small></article>}
+export default function DoctorDashboard(){const navigate=useNavigate();const [data,setData]=useState({appointments:[],patientCount:0,pendingCount:0,acceptedCount:0,sharedAlerts:[]});const [error,setError]=useState("");async function load(){try{setData(await getDoctorDashboard());}catch(e){setError(e.message);}}useEffect(()=>{load();},[]);
+return <div className="patient-feature-page doctor-feature-page"><div className="feature-page-header"><div><span className="feature-eyebrow">CONNECTED DOCTOR PORTAL</span><h1>Clinical workspace</h1><p>Review patient-authorized information and coordinate care from database-backed records.</p></div><button className="feature-secondary-button" onClick={load}><RefreshCw size={16}/>Refresh</button></div><div className="doctor-demo-banner"><Activity size={18}/><p><strong>Academic prototype:</strong> wearable measurements are simulated. Alerts support demonstration only and never replace clinical assessment.</p></div>{error&&<p className="care-error">{error}</p>}
+<section className="feature-section"><div className="feature-metric-grid"><Metric icon={Users} label="Linked patients" value={data.patientCount} detail="Patients with appointment relationships"/><Metric icon={CalendarDays} label="Requests" value={data.appointments.length} detail="Recent appointment requests"/><Metric icon={Clock3} label="Awaiting review" value={data.pendingCount} detail="Pending doctor action"/><Metric icon={CheckCircle2} label="Accepted" value={data.acceptedCount} detail="Active consultation requests"/></div></section>
+<section className="feature-section"><div className="feature-section-heading"><div><h2>Appointment queue</h2><p>Latest requests assigned to your account.</p></div><button className="feature-text-button" onClick={()=>navigate("/doctor/appointments")}>View all <ArrowRight size={15}/></button></div><div className="feature-panel">{data.appointments.length===0?<div className="feature-empty-state"><CalendarDays size={28}/><h3>No requests yet</h3></div>:<div className="care-stack">{data.appointments.map(a=><article className="care-item" key={a.id}><div className="care-item-head"><div><h3>{a.patient.name}</h3><p>{new Date(a.date).toLocaleDateString("en-IN")} at {a.time} · {a.reason||"No reason supplied"}</p></div><span className="care-badge">{a.status}</span></div><button className="care-link-button" onClick={()=>navigate(`/doctor/patients/${a.patient.id}`)}>Open patient <ArrowRight size={14}/></button></article>)}</div>}</div></section>
+{data.sharedAlerts.length>0&&<section className="feature-section"><div className="feature-section-heading"><div><h2>Patient-shared alerts</h2><p>Alert snapshots explicitly shared with appointment requests.</p></div></div><div className="care-stack">{data.sharedAlerts.map((a,i)=><article className={`care-item care-alert ${a.severity}`} key={`${a.id}-${i}`}><h3>{a.patient.name}: {a.metric}</h3><p>{a.message} Observed {a.observedValue}; threshold {a.threshold}.</p></article>)}</div></section>}
+</div>}

@@ -1,0 +1,19 @@
+{
+  "base_model": "unsloth/Qwen3-4B-unsloth-bnb-4bit",
+  "adapter_type": "LoRA",
+  "run_mode": "smoke",
+  "training_examples": 1000,
+  "validation_examples": 200,
+  "max_sequence_length": 2048,
+  "lora_rank": 16,
+  "lora_alpha": 32,
+  "learning_rate": 0.0001,
+  "micro_batch_size": 1,
+  "gradient_accumulation_steps": 8,
+  "optimizer_steps": 100,
+  "epoch": 0.8,
+  "validation_loss_step_50": 1.0855815410614014,
+  "validation_loss_step_100": 1.050118327140808,
+  "best_checkpoint": 100,
+  "medical_correctness_validated": false
+}

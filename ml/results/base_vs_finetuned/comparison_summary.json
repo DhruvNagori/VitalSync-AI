@@ -1,0 +1,21 @@
+{
+  "test_examples_for_loss": 1269,
+  "generated_examples": 50,
+  "original_test_loss": 2.6778621673583984,
+  "finetuned_test_loss": 1.1236755847930908,
+  "original_perplexity": 14.553946112946974,
+  "finetuned_perplexity": 3.0761400631571907,
+  "test_loss_improvement_percent": 58.03833376900235,
+  "original_rouge": {
+    "rouge1": 0.30628165978673827,
+    "rouge2": 0.08588148713140156,
+    "rougeL": 0.16475393092225335,
+    "rougeLsum": 0.2106812429527135
+  },
+  "finetuned_rouge": {
+    "rouge1": 0.3520486401374412,
+    "rouge2": 0.15297753727555308,
+    "rougeL": 0.25522066143278876,
+    "rougeLsum": 0.25578014717660225
+  }
+}

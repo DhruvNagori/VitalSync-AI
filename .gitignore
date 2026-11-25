@@ -50,3 +50,10 @@ medical-records/
 # Optional deployment/build caches
 .vercel/
 .netlify/
+
+# Local LLM weights are large generated artifacts
+*.gguf
+model/*.gguf
+
+# Reconstructed locally from the committed adapter_model.safetensors.part-* files
+ml/artifacts/final_adapter/adapter_model.safetensors

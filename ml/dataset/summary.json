@@ -1,0 +1,45 @@
+{
+  "pipeline_stages": {
+    "raw": 47441,
+    "nonempty_answer": 16407,
+    "remove_answer_equals_question": 16402,
+    "remove_short_question_like_answers": 16389,
+    "remove_resource_placeholders": 15303,
+    "remove_link_dependent": 15181,
+    "deduplicate_normalized_qa": 15133
+  },
+  "safe_records": 12194,
+  "review_required_records": 2939,
+  "splits": {
+    "train": 9722,
+    "valid": 1203,
+    "test": 1269
+  },
+  "focus_overlap_across_splits": 0,
+  "safe_question_types": {
+    "information": 4089,
+    "frequency": 1107,
+    "genetic changes": 1031,
+    "inheritance": 1421,
+    "causes": 618,
+    "symptoms": 2648,
+    "outlook": 353,
+    "research": 358,
+    "complications": 41,
+    "susceptibility": 270,
+    "stages": 75,
+    "considerations": 182,
+    "support groups": 1
+  },
+  "safe_sources": {
+    "GHR": 4209,
+    "GARD": 4300,
+    "NINDS": 774,
+    "CancerGov": 486,
+    "NHLBI": 296,
+    "MPlusHealthTopics": 866,
+    "NIHSeniorHealth": 460,
+    "CDC": 99,
+    "NIDDK": 704
+  }
+}

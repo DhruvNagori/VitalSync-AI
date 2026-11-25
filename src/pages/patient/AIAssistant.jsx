@@ -1,26 +1,54 @@
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import {
   BrainCircuit,
   Send,
   UserRound,
-  Sparkles
+  Sparkles,
+  CalendarPlus
 } from "lucide-react";
 
 import {
   PageHeader,
-  Panel,
-  DemoNotice
+  Panel
 } from "../../components/patient/PageComponents";
+import { getChatHistory, getKnowledgeSources, sendChatMessage } from "../../services/chatService";
 
 function AIAssistant() {
+
+  const navigate = useNavigate();
 
   const [question, setQuestion] = useState("");
 
   const [messages, setMessages] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [knowledgeCount, setKnowledgeCount] = useState(0);
+  const messagesEndRef = useRef(null);
 
-  function handleSubmit(e) {
+  useEffect(() => {
+    let active = true;
+    Promise.all([getChatHistory(), getKnowledgeSources()])
+      .then(([items, knowledge]) => {
+        if (active) setMessages(items.map((item) => ({
+          id: item.id,
+          text: item.content,
+          sender: item.role === "user" ? "user" : "assistant",
+          sources: item.sources || []
+        })));
+        if (active) setKnowledgeCount(knowledge.count || 0);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isLoading]);
+
+  async function handleSubmit(e) {
 
     e.preventDefault();
 
@@ -28,16 +56,43 @@ function AIAssistant() {
       return;
     }
 
-    setMessages((previous) => [
-      ...previous,
-      {
-        id: Date.now(),
-        text: question.trim(),
-        sender: "user"
-      }
-    ]);
+    const submittedQuestion = question.trim();
+    const priorMessages = messages;
+    const userMessage = {
+      id: crypto.randomUUID(),
+      text: submittedQuestion,
+      sender: "user"
+    };
 
+    setMessages([...priorMessages, userMessage]);
     setQuestion("");
+    setError("");
+    setIsLoading(true);
+
+    try {
+      const history = priorMessages.map((message) => ({
+        role: message.sender === "user" ? "user" : "assistant",
+        content: message.text
+      }));
+      const result = await sendChatMessage(submittedQuestion, history);
+
+      setMessages((previous) => [
+        ...previous,
+        {
+          id: crypto.randomUUID(),
+          text: result.reply,
+          sender: "assistant",
+          emergencyDetected: result.emergency_detected,
+          sources: result.sources || [],
+          ragUsed: result.rag_used,
+          knowledgeScopeLimited: result.knowledge_scope_limited
+        }
+      ]);
+    } catch (requestError) {
+      setError(requestError.message || "The assistant could not answer right now.");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -48,8 +103,6 @@ function AIAssistant() {
         title="AI Health Assistant"
         description="A dedicated space for healthcare-related questions and personalized health information."
       />
-
-      <DemoNotice />
 
       <section className="feature-section">
 
@@ -65,11 +118,11 @@ function AIAssistant() {
 
               <div>
                 <h3>VitalSync AI Assistant</h3>
-                <p>Medical knowledge assistant · Preview</p>
+                <p>Fine-tuned Qwen3-4B · Trusted-source RAG · Local inference</p>
               </div>
 
               <span className="feature-status">
-                RAG Integration Pending
+                RAG · {knowledgeCount || "…"} sources
               </span>
 
             </div>
@@ -86,36 +139,36 @@ function AIAssistant() {
                   <h2>How can I help you today?</h2>
 
                   <p>
-                    Ask a healthcare-related question.
-                    The connected RAG system will eventually
-                    use supported medical knowledge and your
-                    authorized health information to respond.
+                    Ask about iron deficiency, blood pressure, diabetes,
+                    asthma, stroke, heart attack, dehydration, or the common cold.
+                    Do not use this assistant for diagnosis,
+                    treatment decisions, or emergencies.
                   </p>
 
                   <div className="ai-suggestions">
 
                     <button
                       onClick={() =>
-                        setQuestion("Help me understand my health report.")
+                        setQuestion("How can iron deficiency be evaluated and improved safely?")
                       }
                     >
-                      Understand a health report
+                      Understand iron deficiency
                     </button>
 
                     <button
                       onClick={() =>
-                        setQuestion("Explain common health measurements.")
+                        setQuestion("What healthy habits can help manage high blood pressure?")
                       }
                     >
-                      Understand health measurements
+                      Manage blood pressure
                     </button>
 
                     <button
                       onClick={() =>
-                        setQuestion("What information should I discuss with my doctor?")
+                        setQuestion("What are the warning signs of a stroke?")
                       }
                     >
-                      Prepare for a doctor visit
+                      Recognize stroke warning signs
                     </button>
 
                   </div>
@@ -147,6 +200,42 @@ function AIAssistant() {
 
                     <div className="ai-message-content">
                       {message.text}
+                      {message.sources?.length > 0 && (
+                        <div className="ai-message-sources">
+                          <strong>Trusted sources</strong>
+                          {message.sources.map((source) => (
+                            <a
+                              href={source.url}
+                              key={source.url}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              [{source.label}] {source.title}
+                              {source.organization ? ` · ${source.organization}` : ""}
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                      {message.knowledgeScopeLimited && (
+                        <div className="care-badge warning" style={{ marginTop: 12 }}>
+                          No reviewed source match · model not used
+                        </div>
+                      )}
+                      {message.sender === "assistant" && (
+                        <button
+                          type="button"
+                          className="feature-secondary-button"
+                          style={{ marginTop: 12 }}
+                          onClick={() => navigate("/patient/appointments", {
+                            state: {
+                              reason: `I would like to discuss this health question: ${priorHealthQuestion(messages, message.id)}`,
+                              chatSummary: message.text.slice(0, 3500)
+                            }
+                          })}
+                        >
+                          <CalendarPlus size={15} /> Discuss with a doctor
+                        </button>
+                      )}
                     </div>
 
                   </div>
@@ -154,6 +243,19 @@ function AIAssistant() {
                 ))
 
               )}
+
+              {isLoading && (
+                <div className="ai-chat-message assistant-message">
+                  <div className="ai-message-icon">
+                    <BrainCircuit size={18} />
+                  </div>
+                  <div className="ai-message-content ai-message-loading">
+                    Thinking…
+                  </div>
+                </div>
+              )}
+
+              <div ref={messagesEndRef} />
 
             </div>
 
@@ -172,7 +274,7 @@ function AIAssistant() {
 
               <button
                 type="submit"
-                disabled={!question.trim()}
+                disabled={!question.trim() || isLoading}
                 aria-label="Send message"
               >
                 <Send size={19} />
@@ -180,9 +282,11 @@ function AIAssistant() {
 
             </form>
 
+            {error && <p className="ai-chat-error" role="alert">{error}</p>}
+
             <p className="ai-chat-disclaimer">
-              Preview only. Messages are not sent to an AI model.
-              Do not enter real medical or personal information.
+              Academic demonstration only. Not a medical diagnosis or a
+              substitute for professional care. Do not enter identifying data.
             </p>
 
           </div>
@@ -196,3 +300,11 @@ function AIAssistant() {
 }
 
 export default AIAssistant;
+
+function priorHealthQuestion(messages, assistantId) {
+  const index = messages.findIndex((item) => item.id === assistantId);
+  for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+    if (messages[cursor].sender === "user") return messages[cursor].text.slice(0, 500);
+  }
+  return "My recent AI health conversation";
+}

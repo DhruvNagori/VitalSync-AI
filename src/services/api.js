@@ -1,5 +1,12 @@
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
+export const ACCESS_TOKEN_KEY = "vitalsync_access_token";
+
+export function getAccessToken() {
+  return localStorage.getItem(ACCESS_TOKEN_KEY) ||
+    sessionStorage.getItem(ACCESS_TOKEN_KEY);
+}
 
 export async function apiRequest(endpoint, options = {}) {
 
@@ -7,11 +14,13 @@ export async function apiRequest(endpoint, options = {}) {
     throw new Error("Backend API URL is not configured.");
   }
 
+  const token = getAccessToken();
   const response = await fetch(
     `${API_BASE_URL}${endpoint}`,
     {
       ...options,
       headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...options.headers
       }
     }

@@ -1,56 +1,76 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { resetDemoDoctorDirectory } from "../services/doctorService";
+import { ACCESS_TOKEN_KEY, getAccessToken } from "../services/api";
+import {
+  getCurrentAccount,
+  loginAccount,
+  registerAccount
+} from "../services/authService";
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [users, setUsers] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   useEffect(() => {
-    // Demo accounts are in memory only; clear the persisted doctor list too.
-    resetDemoDoctorDirectory();
-  }, []);
+    let active = true;
 
-  function register(userData) {
-    const normalizedEmail = userData.email.trim().toLowerCase();
-    const existingUser = users.find((user) => user.email === normalizedEmail);
-    if (existingUser) {
-      return { success: false, message: "An account with this email already exists." };
+    async function restoreSession() {
+      if (!getAccessToken()) {
+        setIsAuthLoading(false);
+        return;
+      }
+
+      try {
+        const user = await getCurrentAccount();
+        if (active) setCurrentUser(user);
+      } catch {
+        localStorage.removeItem(ACCESS_TOKEN_KEY);
+        sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+      } finally {
+        if (active) setIsAuthLoading(false);
+      }
     }
 
-    const newUser = {
-      id: Date.now(),
-      name: userData.name.trim(),
-      email: normalizedEmail,
-      password: userData.password,
-      phone: userData.phone,
-      role: userData.role,
-      isVerified: userData.role === "patient"
+    restoreSession();
+    return () => {
+      active = false;
     };
-    setUsers((previousUsers) => [...previousUsers, newUser]);
-    const { password, ...safeUser } = newUser;
-    setCurrentUser(safeUser);
-    return { success: true, user: safeUser };
+  }, []);
+
+  async function register(userData) {
+    try {
+      const result = await registerAccount(userData);
+      sessionStorage.setItem(ACCESS_TOKEN_KEY, result.access_token);
+      setCurrentUser(result.user);
+      return { success: true, user: result.user };
+    } catch (error) {
+      return { success: false, message: error.message };
+    }
   }
 
-  function login(email, password) {
-    const normalizedEmail = email.trim().toLowerCase();
-    const user = users.find((account) =>
-      account.email === normalizedEmail && account.password === password
-    );
-    if (!user) return { success: false, message: "Invalid email or password." };
-    const { password: storedPassword, ...safeUser } = user;
-    setCurrentUser(safeUser);
-    return { success: true, user: safeUser };
+  async function login(email, password, rememberMe) {
+    try {
+      const result = await loginAccount(email, password, rememberMe);
+      const storage = rememberMe ? localStorage : sessionStorage;
+      const otherStorage = rememberMe ? sessionStorage : localStorage;
+      otherStorage.removeItem(ACCESS_TOKEN_KEY);
+      storage.setItem(ACCESS_TOKEN_KEY, result.access_token);
+      setCurrentUser(result.user);
+      return { success: true, user: result.user };
+    } catch (error) {
+      return { success: false, message: error.message };
+    }
   }
 
   function logout() {
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+    sessionStorage.removeItem(ACCESS_TOKEN_KEY);
     setCurrentUser(null);
   }
 
   return (
-    <AuthContext.Provider value={{ currentUser, register, login, logout }}>
+    <AuthContext.Provider value={{ currentUser, isAuthLoading, register, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

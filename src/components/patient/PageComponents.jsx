@@ -163,11 +163,11 @@ export function EmptyState({
 export function DemoNotice() {
   return (
     <div className="feature-demo-notice">
-      <strong>Demonstration mode:</strong>
+      <strong>Academic prototype:</strong>
       {" "}
-      This page uses illustrative data or local interactions.
-      It is not connected to a real patient database or
-      healthcare service yet.
+      Account and care-workflow data is stored in the project database.
+      Smart-band measurements are clearly labelled simulated and must not
+      be used for medical decisions.
     </div>
   );
 }

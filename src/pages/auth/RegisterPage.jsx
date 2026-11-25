@@ -41,6 +41,7 @@ function RegisterPage() {
 
   const [errors, setErrors] = useState({});
   const [message, setMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   function handleChange(event) {
     const { name, value } = event.target;
@@ -115,7 +116,7 @@ function RegisterPage() {
     return Object.keys(newErrors).length === 0;
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
 
     setMessage("");
@@ -124,10 +125,9 @@ function RegisterPage() {
       return;
     }
 
-    const result = register({
-      ...formData,
-      role: role
-    });
+    setIsSubmitting(true);
+    const result = await register({ ...formData, role });
+    setIsSubmitting(false);
 
     if (!result.success) {
       setMessage(result.message);
@@ -428,8 +428,9 @@ function RegisterPage() {
         <button
           type="submit"
           className="auth-submit-button"
+          disabled={isSubmitting}
         >
-          Create Account
+          {isSubmitting ? "Creating Account…" : "Create Account"}
           <ArrowRight size={18} />
         </button>
 
